@@ -36,6 +36,82 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesCollectionSection) {
 @property (nonatomic, strong) UIButton *deleteButton;
 @end
 
+@interface InstanceSettingCollectionViewCell : UICollectionViewCell
+@property (nonatomic, strong) UIImageView *iconImageView;
+@property (nonatomic, strong) UILabel *titleLabel;
+@property (nonatomic, strong) UILabel *detailLabel;
+@property (nonatomic, strong) UISwitch *toggleSwitch;
+@end
+
+@implementation InstanceSettingCollectionViewCell
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        [self setupUI];
+    }
+    return self;
+}
+
+- (void)setupUI {
+    self.contentView.backgroundColor = [UIColor colorWithRed:0.05f green:0.05f blue:0.05f alpha:0.8f];
+    self.contentView.layer.cornerRadius = 12;
+    self.contentView.layer.borderWidth = 1;
+    self.contentView.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.1f].CGColor;
+    self.contentView.clipsToBounds = YES;
+    
+    // 创建水平布局的StackView
+    UIStackView *mainStack = [[UIStackView alloc] init];
+    mainStack.translatesAutoresizingMaskIntoConstraints = NO;
+    mainStack.axis = UILayoutConstraintAxisHorizontal;
+    mainStack.spacing = 16;
+    mainStack.alignment = UIStackViewAlignmentCenter;
+    mainStack.distribution = UIStackViewDistributionFill;
+    [self.contentView addSubview:mainStack];
+    
+    // 图标
+    self.iconImageView = [[UIImageView alloc] init];
+    self.iconImageView.translatesAutoresizingMaskIntoConstraints = NO;
+    [mainStack addArrangedSubview:self.iconImageView];
+    
+    // 文本信息的垂直StackView
+    UIStackView *textStack = [[UIStackView alloc] init];
+    textStack.axis = UILayoutConstraintAxisVertical;
+    textStack.spacing = 4;
+    textStack.alignment = UIStackViewAlignmentLeading;
+    textStack.distribution = UIStackViewDistributionFill;
+    [mainStack addArrangedSubview:textStack];
+    
+    // 标题
+    self.titleLabel = [[UILabel alloc] init];
+    self.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    self.titleLabel.textColor = [UIColor whiteColor];
+    [textStack addArrangedSubview:self.titleLabel];
+    
+    // 详情
+    self.detailLabel = [[UILabel alloc] init];
+    self.detailLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+    self.detailLabel.textColor = [UIColor colorWithWhite:1.0f alpha:0.7f];
+    [textStack addArrangedSubview:self.detailLabel];
+    
+    // 切换开关
+    self.toggleSwitch = [[UISwitch alloc] init];
+    self.toggleSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+    [mainStack addArrangedSubview:self.toggleSwitch];
+    
+    // 约束
+    [NSLayoutConstraint activateConstraints:@[
+        [mainStack.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:16],
+        [mainStack.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:16],
+        [mainStack.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-16],
+        [mainStack.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-16],
+        [self.iconImageView.widthAnchor constraintEqualToConstant:24],
+        [self.iconImageView.heightAnchor constraintEqualToConstant:24],
+    ]];
+}
+
+@end
+
 @interface LauncherProfilesViewController () <UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout>
 @property(nonatomic) UIBarButtonItem *createButtonItem;
 @property(nonatomic) UICollectionView *collectionView;
@@ -237,6 +313,7 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesCollectionSection) {
     
     // Register cell classes
     [self.collectionView registerClass:[ProfileCollectionViewCell class] forCellWithReuseIdentifier:@"ProfileCell"];
+    [self.collectionView registerClass:[InstanceSettingCollectionViewCell class] forCellWithReuseIdentifier:@"InstanceSettingCell"];
     // Register supplementary view for section headers
     [self.collectionView registerClass:[UICollectionReusableView class] forSupplementaryViewOfKind:UICollectionElementKindSectionHeader withReuseIdentifier:@"SectionHeader"];
     
@@ -307,67 +384,120 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesCollectionSection) {
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
     switch (section) {
-        case kInstances: return 0; // Hide instance settings for now, will be moved to separate section
+        case kInstances: return 3; // 显示实例设置选项
         case kProfiles: return [PLProfiles.current.profiles count];
         default: return 0;
     }
 }
 
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
-    ProfileCollectionViewCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"ProfileCell" forIndexPath:indexPath];
-    
-    NSMutableDictionary *profile = PLProfiles.current.profiles.allValues[indexPath.row];
-    
-    // 确保所有UI操作在主线程执行
-    dispatch_async(dispatch_get_main_queue(), ^{        // 设置标题和版本
-        cell.nameLabel.text = profile[@"name"];
-        cell.versionLabel.text = profile[@"lastVersionId"];
+    if (indexPath.section == kInstances) {
+        InstanceSettingCollectionViewCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"InstanceSettingCell" forIndexPath:indexPath];
         
-        // 设置图标
-        cell.iconImageView.layer.magnificationFilter = kCAFilterNearest;
-        UIImage *fallbackImage = [[UIImage imageNamed:@"DefaultProfile"] _imageWithSize:CGSizeMake(48, 48)];
-        [cell.iconImageView setImageWithURL:[NSURL URLWithString:profile[@"icon"]] placeholderImage:fallbackImage];
-        
-        // 设置状态
-        cell.statusLabel.text = @"Running";
-        cell.statusLabel.textColor = [UIColor systemGreenColor];
-        [cell.statusIndicator setImage:[UIImage systemImageNamed:@"play.fill"]];
-        cell.statusIndicator.tintColor = [UIColor systemGreenColor];
-        
-        // 添加渐变背景
-        CAGradientLayer *gradientLayer = [CAGradientLayer layer];
-        gradientLayer.frame = cell.contentView.bounds;
-        gradientLayer.colors = @[(__bridge id)[UIColor colorWithRed:0.0f green:0.0f blue:0.0f alpha:0.6f].CGColor, 
-                                 (__bridge id)[UIColor colorWithRed:0.0f green:0.0f blue:0.0f alpha:0.8f].CGColor];
-        gradientLayer.startPoint = CGPointMake(0.5, 0.0);
-        gradientLayer.endPoint = CGPointMake(0.5, 1.0);
-        
-        // Remove existing gradient layer if any
-        for (CALayer *layer in cell.contentView.layer.sublayers) {
-            if ([layer isKindOfClass:[CAGradientLayer class]]) {
-                [layer removeFromSuperlayer];
-                break;
+        // 根据行号设置不同的实例设置选项
+        if (indexPath.row == 0) {
+            // 游戏目录
+            [cell.iconImageView setImage:[UIImage systemImageNamed:@"folder"]];
+            cell.titleLabel.text = localize(@"preference.title.game_directory", nil);
+            cell.detailLabel.text = getenv("DEMO_LOCK") ? @".demo" : getPrefObject(@"general.game_directory");
+            cell.toggleSwitch.hidden = YES;
+        } else if (indexPath.row == 1) {
+            // 独立偏好设置
+            NSString *imageName;
+            if (@available(iOS 15.0, *)) {
+                imageName = @"folder.badge.gearshape";
+            } else {
+                imageName = @"folder.badge.gear";
             }
+            [cell.iconImageView setImage:[UIImage systemImageNamed:imageName]];
+            cell.titleLabel.text = localize(@"profile.title.separate_preference", nil);
+            cell.detailLabel.text = localize(@"profile.detail.separate_preference", nil);
+            cell.toggleSwitch.hidden = NO;
+            [cell.toggleSwitch setOn:getPrefBool(@"internal.isolated") animated:NO];
+            [cell.toggleSwitch addTarget:self action:@selector(actionTogglePrefIsolation:) forControlEvents:UIControlEventValueChanged];
+        } else if (indexPath.row == 2) {
+            // 管理 Mod
+            [cell.iconImageView setImage:[UIImage systemImageNamed:@"puzzlepiece.extension"]];
+            cell.titleLabel.text = @"管理 Mod";
+            cell.detailLabel.text = nil;
+            cell.toggleSwitch.hidden = YES;
         }
         
-        // Insert gradient layer at the bottom
-        [cell.contentView.layer insertSublayer:gradientLayer atIndex:0];
-    });
-    
-    return cell;
+        return cell;
+    } else {
+        ProfileCollectionViewCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"ProfileCell" forIndexPath:indexPath];
+        
+        NSMutableDictionary *profile = PLProfiles.current.profiles.allValues[indexPath.row];
+        
+        // 确保所有UI操作在主线程执行
+        dispatch_async(dispatch_get_main_queue(), ^{        // 设置标题和版本
+            cell.nameLabel.text = profile[@"name"];
+            cell.versionLabel.text = profile[@"lastVersionId"];
+            
+            // 设置图标
+            cell.iconImageView.layer.magnificationFilter = kCAFilterNearest;
+            UIImage *fallbackImage = [[UIImage imageNamed:@"DefaultProfile"] _imageWithSize:CGSizeMake(48, 48)];
+            [cell.iconImageView setImageWithURL:[NSURL URLWithString:profile[@"icon"]] placeholderImage:fallbackImage];
+            
+            // 设置状态
+            cell.statusLabel.text = @"Running";
+            cell.statusLabel.textColor = [UIColor systemGreenColor];
+            [cell.statusIndicator setImage:[UIImage systemImageNamed:@"play.fill"]];
+            cell.statusIndicator.tintColor = [UIColor systemGreenColor];
+            
+            // 添加渐变背景
+            CAGradientLayer *gradientLayer = [CAGradientLayer layer];
+            gradientLayer.frame = cell.contentView.bounds;
+            gradientLayer.colors = @[(__bridge id)[UIColor colorWithRed:0.0f green:0.0f blue:0.0f alpha:0.6f].CGColor, 
+                                     (__bridge id)[UIColor colorWithRed:0.0f green:0.0f blue:0.0f alpha:0.8f].CGColor];
+            gradientLayer.startPoint = CGPointMake(0.5, 0.0);
+            gradientLayer.endPoint = CGPointMake(0.5, 1.0);
+            
+            // Remove existing gradient layer if any
+            for (CALayer *layer in cell.contentView.layer.sublayers) {
+                if ([layer isKindOfClass:[CAGradientLayer class]]) {
+                    [layer removeFromSuperlayer];
+                    break;
+                }
+            }
+            
+            // Insert gradient layer at the bottom
+            [cell.contentView.layer insertSublayer:gradientLayer atIndex:0];
+        });
+        
+        return cell;
+    }
 }
 
 #pragma mark - Collection View Delegate Flow Layout
 
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
-    // Calculate cell size based on screen width, 2 columns with spacing
     CGFloat screenWidth = UIScreen.mainScreen.bounds.size.width;
-    CGFloat cellWidth = (screenWidth - 60) / 2; // 20 padding on each side, 20 spacing between cells
-    return CGSizeMake(cellWidth, 220); // Fixed height for cells
+    
+    if (indexPath.section == kInstances) {
+        // 实例设置选项，占满一行
+        return CGSizeMake(screenWidth - 40, 60); // 20 padding on each side
+    } else {
+        // Profile卡片，每行显示2个
+        CGFloat cellWidth = (screenWidth - 60) / 2; // 20 padding on each side, 20 spacing between cells
+        return CGSizeMake(cellWidth, 220); // Fixed height for cells
+    }
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    [self actionEditProfile:PLProfiles.current.profiles.allValues[indexPath.row]];
+    if (indexPath.section == kInstances) {
+        // 处理实例设置选项的点击
+        if (indexPath.row == 0) {
+            // 游戏目录
+            [self.navigationController pushViewController:[LauncherPrefGameDirViewController new] animated:YES];
+        } else if (indexPath.row == 2) {
+            // 管理 Mod
+            [self openManageMods];
+        }
+    } else {
+        // Profile卡片点击
+        [self actionEditProfile:PLProfiles.current.profiles.allValues[indexPath.row]];
+    }
 }
 
 #pragma mark - Header View
