@@ -300,32 +300,35 @@
 }
 
 - (void)addCustomBackgroundView {
-    // 移除旧的背景视图
-    for (UIView *subview in self.contentView.subviews) {
-        if ([subview tag] == 999) {
-            [subview removeFromSuperview];
+    // Ensure UI operations are performed on the main thread
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // 移除旧的背景视图
+        for (UIView *subview in self.contentView.subviews) {
+            if ([subview tag] == 999) {
+                [subview removeFromSuperview];
+            }
         }
-    }
-    
-    // 创建新的背景视图
-    UIView *backgroundView = [[UIView alloc] init];
-    backgroundView.translatesAutoresizingMaskIntoConstraints = NO;
-    backgroundView.backgroundColor = [UIColor colorWithRed:0.1f green:0.1f blue:0.1f alpha:0.8f];
-    backgroundView.layer.borderWidth = 1.0f;
-    backgroundView.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.1f].CGColor;
-    backgroundView.layer.cornerRadius = 16.0f;
-    backgroundView.tag = 999;
-    
-    // 将背景视图插入到最底层
-    [self.contentView insertSubview:backgroundView atIndex:0];
-    
-    // 设置约束
-    [NSLayoutConstraint activateConstraints:@[
-        [backgroundView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:0],
-        [backgroundView.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:0],
-        [backgroundView.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:0],
-        [backgroundView.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:0]
-    ]];
+        
+        // 创建新的背景视图
+        UIView *backgroundView = [[UIView alloc] init];
+        backgroundView.translatesAutoresizingMaskIntoConstraints = NO;
+        backgroundView.backgroundColor = [UIColor colorWithRed:0.1f green:0.1f blue:0.1f alpha:0.8f];
+        backgroundView.layer.borderWidth = 1.0f;
+        backgroundView.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.1f].CGColor;
+        backgroundView.layer.cornerRadius = 16.0f;
+        backgroundView.tag = 999;
+        
+        // 将背景视图插入到最底层
+        [self.contentView insertSubview:backgroundView atIndex:0];
+        
+        // 设置约束
+        [NSLayoutConstraint activateConstraints:@[
+            [backgroundView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:0],
+            [backgroundView.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:0],
+            [backgroundView.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:0],
+            [backgroundView.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:0]
+        ]];
+    });
 }
 
 - (void)configureForOnlineMode:(ModItem *)mod {

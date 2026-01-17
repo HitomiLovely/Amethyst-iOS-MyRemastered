@@ -275,7 +275,11 @@
                     NSString *iconPath = json[@"icon"];
                     if ([iconPath isKindOfClass:[NSString class]]) {
                         NSData *iconData = [self readFileFromJar:mod.filePath entryName:iconPath];
-                        if (iconData) mod.icon = [[UIImage alloc] initWithData:iconData];
+                        if (iconData) {
+                            dispatch_async(dispatch_get_main_queue(), ^{  // Ensure UI operation on main thread
+                                mod.icon = [[UIImage alloc] initWithData:iconData];
+                            });
+                        }
                     }
                     if (completion) completion(mod, nil);
                     return;
@@ -329,7 +333,11 @@
                         NSString *logoFile = modInfo[@"logoFile"];
                         if (logoFile.length > 0) {
                             NSData *logoData = [self readFileFromJar:mod.filePath entryName:logoFile];
-                            if (logoData) mod.icon = [[UIImage alloc] initWithData:logoData];
+                            if (logoData) {
+                                dispatch_async(dispatch_get_main_queue(), ^{  // Ensure UI operation on main thread
+                                    mod.icon = [[UIImage alloc] initWithData:logoData];
+                                });
+                            }
                         }
                         if (completion) completion(mod, nil);
                         return;
