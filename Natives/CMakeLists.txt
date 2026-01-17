@@ -180,6 +180,7 @@ add_executable(AngelAuraAmethyst
   ModTableViewCell.m
   ModTableViewController.m
   ModsManagerViewController.m
+  ModDownloadPopupViewController.m
   ModVersion.m
   ModVersionViewController.m
   ModVersionTableViewCell.m
