@@ -131,8 +131,8 @@
              performSelector:@selector(initWithSharingItems:)
              withObject:@[[NSURL URLWithString:latestlogPath]]];
         }
-        activityVC.popoverPresentationController.sourceView = titleView;
-        activityVC.popoverPresentationController.sourceRect = titleView.bounds;
+        activityVC.popoverPresentationController.sourceView = self.view;
+        activityVC.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 0, 0);
         [self presentViewController:activityVC animated:YES completion:nil];
     }]];
     
