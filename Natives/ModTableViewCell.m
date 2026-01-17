@@ -155,10 +155,13 @@
     
     // Reload loader icons when interface style changes
     if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
-        // Simply reload the current cell configuration to update icons
-        if (self.currentMod) {
-            [self configureForLocalMode:self.currentMod];
-        }
+        // Ensure UI operations are performed on the main thread
+        dispatch_async(dispatch_get_main_queue(), ^{  
+            // Simply reload the current cell configuration to update icons
+            if (self.currentMod) {
+                [self configureForLocalMode:self.currentMod];
+            }
+        });
     }
 }
 
@@ -222,26 +225,37 @@
 #pragma mark - Configuration
 
 - (void)configureWithMod:(ModItem *)mod displayMode:(ModTableViewCellDisplayMode)mode {
-    self.currentMod = mod;
+    // Ensure all UI operations are performed on the main thread
+    dispatch_async(dispatch_get_main_queue(), ^{  
+        self.currentMod = mod;
 
-    _nameLabel.text = mod.displayName ?: mod.fileName;
+        _nameLabel.text = mod.displayName ?: mod.fileName;
 
-    if (mod.icon) {
-        _modIconView.image = mod.icon;
-    } else if (mod.iconURL) {
-        [_modIconView setImageWithURL:[NSURL URLWithString:mod.iconURL] placeholderImage:[UIImage systemImageNamed:@"puzzlepiece.extension"]];
-    } else {
-        _modIconView.image = [UIImage systemImageNamed:@"puzzlepiece.extension"];
-    }
+        if (mod.icon) {
+            _modIconView.image = mod.icon;
+        } else if (mod.iconURL) {
+            [_modIconView setImageWithURL:[NSURL URLWithString:mod.iconURL] placeholderImage:[UIImage systemImageNamed:@"puzzlepiece.extension"]];
+        } else {
+            _modIconView.image = [UIImage systemImageNamed:@"puzzlepiece.extension"];
+        }
 
-    if (mode == ModTableViewCellDisplayModeLocal) {
-        [self configureForLocalMode:mod];
-    } else {
-        [self configureForOnlineMode:mod];
-    }
+        if (mode == ModTableViewCellDisplayModeLocal) {
+            [self configureForLocalMode:mod];
+        } else {
+            [self configureForOnlineMode:mod];
+        }
+    });
 }
 
 - (void)configureForLocalMode:(ModItem *)mod {
+    // Ensure all UI operations are performed on the main thread
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{  
+            [self configureForLocalMode:mod];
+        });
+        return;
+    }
+    
     // 添加自定义背景视图
     [self addCustomBackgroundView];
     
@@ -332,6 +346,14 @@
 }
 
 - (void)configureForOnlineMode:(ModItem *)mod {
+    // Ensure all UI operations are performed on the main thread
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{  
+            [self configureForOnlineMode:mod];
+        });
+        return;
+    }
+    
     // Hide local/unused elements
     _enableSwitch.hidden = YES;
     _loaderBadgesStackView.hidden = YES;
@@ -362,8 +384,15 @@
 #pragma mark - State Updates
 
 - (void)updateToggleState:(BOOL)disabled {
-    [_enableSwitch setOn:!disabled animated:YES];
-    self.contentView.alpha = disabled ? 0.6 : 1.0;
+    // Ensure UI operations are performed on the main thread
+    if ([NSThread isMainThread]) {
+        [_enableSwitch setOn:!disabled animated:YES];
+        self.contentView.alpha = disabled ? 0.6 : 1.0;
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{  
+            [self updateToggleState:disabled];
+        });
+    }
 }
 
 #pragma mark - Actions
