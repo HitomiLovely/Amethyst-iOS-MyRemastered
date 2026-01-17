@@ -399,6 +399,7 @@
         
         // 添加左侧边框视图
         UIView *leftBorderView = [[UIView alloc] init];
+        leftBorderView.tag = 100; // 设置tag以便后续获取
         leftBorderView.translatesAutoresizingMaskIntoConstraints = NO;
         [leftBorderView.widthAnchor constraintEqualToConstant:3].active = YES;
         leftBorderView.backgroundColor = [UIColor clearColor];
@@ -442,7 +443,7 @@
     }
     
     // 检查当前是否为选中状态
-    UIView *leftBorderView = cell.subviews.firstObject;
+    UIView *leftBorderView = [cell viewWithTag:100]; // 使用tag获取左侧边框视图，更可靠
     if (indexPath.row == self.lastSelectedIndex || (self.isInitialVc && indexPath.row == 0)) {
         // 选中状态
         leftBorderView.backgroundColor = [UIColor colorWithRed:139/255.0 green:92/255.0 blue:246/255.0 alpha:1.0];
