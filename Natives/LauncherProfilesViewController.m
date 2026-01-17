@@ -237,6 +237,8 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesCollectionSection) {
     
     // Register cell classes
     [self.collectionView registerClass:[ProfileCollectionViewCell class] forCellWithReuseIdentifier:@"ProfileCell"];
+    // Register supplementary view for section headers
+    [self.collectionView registerClass:[UICollectionReusableView class] forSupplementaryViewOfKind:UICollectionElementKindSectionHeader withReuseIdentifier:@"SectionHeader"];
     
     // Set as main view
     self.view = self.collectionView;
