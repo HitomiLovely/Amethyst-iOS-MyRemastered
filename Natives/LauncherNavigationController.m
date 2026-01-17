@@ -46,57 +46,116 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         [self setNeedsUpdateOfScreenEdgesDeferringSystemGestures];
     }
 
-    self.versionTextField = [[PickTextField alloc] initWithFrame:CGRectMake(4, 4, self.toolbar.frame.size.width * 0.8 - 8, self.toolbar.frame.size.height - 8)];
+    // 设置工具栏样式
+    self.toolbarHidden = NO;
+    self.toolbar.barTintColor = [UIColor systemBackgroundColor];
+    self.toolbar.tintColor = [UIColor labelColor];
+    
+    // 创建版本选择器
+    self.versionTextField = [[PickTextField alloc] init];
+    self.versionTextField.translatesAutoresizingMaskIntoConstraints = NO;
     [self.versionTextField addTarget:self.versionTextField action:@selector(resignFirstResponder) forControlEvents:UIControlEventEditingDidEndOnExit];
-    self.versionTextField.autoresizingMask = AUTORESIZE_MASKS;
     self.versionTextField.placeholder = @"Specify version...";
-    self.versionTextField.leftView = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, 40, 40)];
-    self.versionTextField.rightView = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"SpinnerArrow"] _imageWithSize:CGSizeMake(30, 30)]];
-    self.versionTextField.rightView.frame = CGRectMake(0, 0, self.versionTextField.frame.size.height * 0.9, self.versionTextField.frame.size.height * 0.9);
+    self.versionTextField.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+    self.versionTextField.textColor = [UIColor labelColor];
+    self.versionTextField.backgroundColor = [UIColor systemBackgroundColor];
+    self.versionTextField.layer.borderWidth = 1;
+    self.versionTextField.layer.borderColor = [UIColor separatorColor].CGColor;
+    self.versionTextField.layer.cornerRadius = 8;
+    
+    // 设置左右视图
+    UIImageView *leftView = [[UIImageView alloc] initWithFrame:CGRectMake(0, 0, 40, 40)];
+    self.versionTextField.leftView = leftView;
+    
+    UIImageView *rightView = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"SpinnerArrow"] _imageWithSize:CGSizeMake(20, 20)]];
+    rightView.contentMode = UIViewContentModeCenter;
+    rightView.frame = CGRectMake(0, 0, 40, 40);
+    self.versionTextField.rightView = rightView;
+    
     self.versionTextField.leftViewMode = UITextFieldViewModeAlways;
     self.versionTextField.rightViewMode = UITextFieldViewModeAlways;
-    self.versionTextField.textAlignment = NSTextAlignmentCenter;
-
+    self.versionTextField.textAlignment = NSTextAlignmentLeft;
+    self.versionTextField.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
+    self.versionTextField.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    
+    // 创建版本选择器
     self.versionPickerView = [[PLPickerView alloc] init];
     self.versionPickerView.delegate = self;
     self.versionPickerView.dataSource = self;
+    
+    // 创建选择器工具栏
     UIToolbar *versionPickToolbar = [[UIToolbar alloc] initWithFrame:CGRectMake(0.0, 0.0, self.view.frame.size.width, 44.0)];
-
-    [self reloadProfileList];
-
+    versionPickToolbar.barStyle = UIBarStyleDefault;
     UIBarButtonItem *versionFlexibleSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:self action:nil];
     UIBarButtonItem *versionDoneButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(versionClosePicker)];
     versionPickToolbar.items = @[versionFlexibleSpace, versionDoneButton];
     self.versionTextField.inputAccessoryView = versionPickToolbar;
     self.versionTextField.inputView = self.versionPickerView;
-
-    UIView *targetToolbar = self.toolbar;
-    [targetToolbar addSubview:self.versionTextField];
-
-    self.progressViewMain = [[UIProgressView alloc] initWithFrame:CGRectMake(0, 0, self.toolbar.frame.size.width, 4)];
-    self.progressViewMain.autoresizingMask = AUTORESIZE_MASKS;
-    self.progressViewMain.hidden = YES;
-    [targetToolbar addSubview:self.progressViewMain];
-
+    
+    // 创建播放按钮
     self.buttonInstall = [UIButton buttonWithType:UIButtonTypeSystem];
     setButtonPointerInteraction(self.buttonInstall);
     [self.buttonInstall setTitle:localize(@"Play", nil) forState:UIControlStateNormal];
-    self.buttonInstall.autoresizingMask = AUTORESIZE_MASKS;
-    self.buttonInstall.backgroundColor = [UIColor colorWithRed:121/255.0 green:56/255.0 blue:162/255.0 alpha:1.0];
-    self.buttonInstall.layer.cornerRadius = 5;
-    self.buttonInstall.frame = CGRectMake(self.toolbar.frame.size.width * 0.8, 4, self.toolbar.frame.size.width * 0.2, self.toolbar.frame.size.height - 8);
+    self.buttonInstall.translatesAutoresizingMaskIntoConstraints = NO;
+    self.buttonInstall.backgroundColor = [UIColor colorWithRed:139/255.0 green:92/255.0 blue:246/255.0 alpha:1.0];
+    self.buttonInstall.layer.cornerRadius = 8;
     self.buttonInstall.tintColor = UIColor.whiteColor;
+    self.buttonInstall.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     self.buttonInstall.enabled = NO;
     [self.buttonInstall addTarget:self action:@selector(performInstallOrShowDetails:) forControlEvents:UIControlEventPrimaryActionTriggered];
-    [targetToolbar addSubview:self.buttonInstall];
-
-    self.progressText = [[UILabel alloc] initWithFrame:self.versionTextField.frame];
+    
+    // 创建进度视图
+    self.progressViewMain = [[UIProgressView alloc] init];
+    self.progressViewMain.translatesAutoresizingMaskIntoConstraints = NO;
+    self.progressViewMain.hidden = YES;
+    self.progressViewMain.progressTintColor = [UIColor colorWithRed:139/255.0 green:92/255.0 blue:246/255.0 alpha:1.0];
+    self.progressViewMain.trackTintColor = [UIColor systemGray3Color];
+    
+    // 创建进度文本
+    self.progressText = [[UILabel alloc] init];
+    self.progressText.translatesAutoresizingMaskIntoConstraints = NO;
     self.progressText.adjustsFontSizeToFitWidth = YES;
-    self.progressText.autoresizingMask = AUTORESIZE_MASKS;
-    self.progressText.font = [self.progressText.font fontWithSize:16];
+    self.progressText.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
     self.progressText.textAlignment = NSTextAlignmentCenter;
+    self.progressText.textColor = [UIColor labelColor];
     self.progressText.userInteractionEnabled = NO;
+    
+    // 添加视图到工具栏
+    UIView *targetToolbar = self.toolbar;
+    [targetToolbar addSubview:self.versionTextField];
+    [targetToolbar addSubview:self.buttonInstall];
+    [targetToolbar addSubview:self.progressViewMain];
     [targetToolbar addSubview:self.progressText];
+    
+    // 设置约束
+    [NSLayoutConstraint activateConstraints:@[
+        // 版本文本框约束
+        [self.versionTextField.leadingAnchor constraintEqualToAnchor:targetToolbar.leadingAnchor constant:16],
+        [self.versionTextField.topAnchor constraintEqualToAnchor:targetToolbar.topAnchor constant:8],
+        [self.versionTextField.bottomAnchor constraintEqualToAnchor:targetToolbar.bottomAnchor constant:-8],
+        [self.versionTextField.widthAnchor constraintEqualToAnchor:targetToolbar.widthAnchor multiplier:0.8 constant:-24],
+        [self.versionTextField.heightAnchor constraintEqualToConstant:40],
+        
+        // 播放按钮约束
+        [self.buttonInstall.leadingAnchor constraintEqualToAnchor:self.versionTextField.trailingAnchor constant:8],
+        [self.buttonInstall.topAnchor constraintEqualToAnchor:targetToolbar.topAnchor constant:8],
+        [self.buttonInstall.bottomAnchor constraintEqualToAnchor:targetToolbar.bottomAnchor constant:-8],
+        [self.buttonInstall.widthAnchor constraintEqualToAnchor:targetToolbar.widthAnchor multiplier:0.2 constant:-24],
+        [self.buttonInstall.heightAnchor constraintEqualToConstant:40],
+        
+        // 进度视图约束
+        [self.progressViewMain.leadingAnchor constraintEqualToAnchor:targetToolbar.leadingAnchor],
+        [self.progressViewMain.topAnchor constraintEqualToAnchor:targetToolbar.topAnchor],
+        [self.progressViewMain.trailingAnchor constraintEqualToAnchor:targetToolbar.trailingAnchor],
+        [self.progressViewMain.heightAnchor constraintEqualToConstant:4],
+        
+        // 进度文本约束
+        [self.progressText.leadingAnchor constraintEqualToAnchor:self.versionTextField.leadingAnchor],
+        [self.progressText.trailingAnchor constraintEqualToAnchor:self.versionTextField.trailingAnchor],
+        [self.progressText.centerYAnchor constraintEqualToAnchor:self.versionTextField.centerYAnchor]
+    ]];
+    
+    [self reloadProfileList];
 
     [self fetchRemoteVersionList];
     [NSNotificationCenter.defaultCenter addObserver:self

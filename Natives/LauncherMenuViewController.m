@@ -58,10 +58,38 @@
     
     self.isInitialVc = YES;
     
-    UIImageView *titleView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"AppLogo"]];
-    [titleView setContentMode:UIViewContentModeScaleAspectFit];
-    self.navigationItem.titleView = titleView;
-    [titleView sizeToFit];
+    // 创建应用Logo和标题
+    UIView *headerContainer = [[UIView alloc] init];
+    headerContainer.translatesAutoresizingMaskIntoConstraints = NO;
+    
+    UIImageView *appLogo = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"AppLogo"]];
+    appLogo.translatesAutoresizingMaskIntoConstraints = NO;
+    appLogo.contentMode = UIViewContentModeScaleAspectFit;
+    
+    UILabel *appTitle = [[UILabel alloc] init];
+    appTitle.translatesAutoresizingMaskIntoConstraints = NO;
+    appTitle.text = @"Amethyst";
+    appTitle.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
+    appTitle.textColor = [UIColor labelColor];
+    
+    [headerContainer addSubview:appLogo];
+    [headerContainer addSubview:appTitle];
+    
+    // 设置约束
+    [NSLayoutConstraint activateConstraints:@[
+        [appLogo.widthAnchor constraintEqualToConstant:40],
+        [appLogo.heightAnchor constraintEqualToConstant:40],
+        [appLogo.leadingAnchor constraintEqualToAnchor:headerContainer.leadingAnchor],
+        [appLogo.centerYAnchor constraintEqualToAnchor:headerContainer.centerYAnchor],
+        
+        [appTitle.leadingAnchor constraintEqualToAnchor:appLogo.trailingAnchor constant:12],
+        [appTitle.centerYAnchor constraintEqualToAnchor:headerContainer.centerYAnchor],
+        [appTitle.trailingAnchor constraintEqualToAnchor:headerContainer.trailingAnchor],
+        
+        [headerContainer.heightAnchor constraintEqualToConstant:64]
+    ]];
+    
+    self.navigationItem.titleView = headerContainer;
     
     self.options = @[
         [LauncherMenuCustomItem vcClass:LauncherNewsViewController.class],
@@ -130,17 +158,13 @@
         }]];
     }
     
+    // 设置表格视图样式
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    self.tableView.backgroundColor = [UIColor systemBackgroundColor];
+    self.tableView.rowHeight = 48;
     
-    self.navigationController.toolbarHidden = NO;
-    UIActivityIndicatorViewStyle indicatorStyle = UIActivityIndicatorViewStyleMedium;
-    UIActivityIndicatorView *toolbarIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:indicatorStyle];
-    [toolbarIndicator startAnimating];
-    self.toolbarItems = @[
-        [[UIBarButtonItem alloc] initWithCustomView:toolbarIndicator],
-        [[UIBarButtonItem alloc] init]
-    ];
-    self.toolbarItems[1].tintColor = UIColor.labelColor;
+    // 隐藏工具栏
+    self.navigationController.toolbarHidden = YES;
     
     // Setup the account button
     self.accountBtnItem = [self drawAccountButton];
@@ -362,28 +386,75 @@
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"cell"];
     if (cell == nil) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"cell"];
+        
+        // 设置单元格样式
+        cell.backgroundColor = [UIColor systemBackgroundColor];
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        
+        // 设置文本样式
+        cell.textLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+        cell.textLabel.textColor = [UIColor labelColor];
+        
+        // 添加左侧边框视图
+        UIView *leftBorderView = [[UIView alloc] init];
+        leftBorderView.translatesAutoresizingMaskIntoConstraints = NO;
+        [leftBorderView.widthAnchor constraintEqualToConstant:3].active = YES;
+        leftBorderView.backgroundColor = [UIColor clearColor];
+        [cell addSubview:leftBorderView];
+        
+        // 设置左侧边框约束
+        [NSLayoutConstraint activateConstraints:@[
+            [leftBorderView.leadingAnchor constraintEqualToAnchor:cell.leadingAnchor],
+            [leftBorderView.topAnchor constraintEqualToAnchor:cell.topAnchor],
+            [leftBorderView.bottomAnchor constraintEqualToAnchor:cell.bottomAnchor],
+            [leftBorderView.widthAnchor constraintEqualToConstant:3]
+        ]];
+        
+        // 设置内容边距
+        cell.contentView.layoutMargins = UIEdgeInsetsMake(0, 20, 0, 20);
     }
 
     cell.textLabel.text = [self.options[indexPath.row] title];
     
+    // 设置图标
     UIImage *origImage = [UIImage systemImageNamed:[self.options[indexPath.row]
         performSelector:@selector(imageName)]];
     if (origImage) {
-        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(40, 40)];
+        // 调整图标大小
+        CGFloat iconSize = 24;
+        UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(iconSize, iconSize)];
         UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext*_Nonnull myContext) {
-            CGFloat scaleFactor = 40/origImage.size.height;
-            [origImage drawInRect:CGRectMake(20 - origImage.size.width*scaleFactor/2, 0, origImage.size.width*scaleFactor, 40)];
+            [origImage drawInRect:CGRectMake(0, 0, iconSize, iconSize)];
         }];
         cell.imageView.image = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    }
-    
-    if (cell.imageView.image == nil) {
+    } else {
+        // 使用自定义图片
         cell.imageView.layer.magnificationFilter = kCAFilterNearest;
         cell.imageView.layer.minificationFilter = kCAFilterNearest;
-        cell.imageView.image = [UIImage imageNamed:[self.options[indexPath.row]
-            performSelector:@selector(imageName)]];
-        cell.imageView.image = [cell.imageView.image _imageWithSize:CGSizeMake(40, 40)];
+        UIImage *iconImage = [UIImage imageNamed:[self.options[indexPath.row] performSelector:@selector(imageName)]];
+        if (iconImage) {
+            cell.imageView.image = [iconImage _imageWithSize:CGSizeMake(24, 24)];
+        } else {
+            cell.imageView.image = nil;
+        }
     }
+    
+    // 检查当前是否为选中状态
+    UIView *leftBorderView = cell.subviews.firstObject;
+    if (indexPath.row == self.lastSelectedIndex || (self.isInitialVc && indexPath.row == 0)) {
+        // 选中状态
+        leftBorderView.backgroundColor = [UIColor colorWithRed:139/255.0 green:92/255.0 blue:246/255.0 alpha:1.0];
+        cell.backgroundColor = [UIColor colorWithRed:139/255.0 green:92/255.0 blue:246/255.0 alpha:0.1];
+        cell.textLabel.textColor = [UIColor colorWithRed:139/255.0 green:92/255.0 blue:246/255.0 alpha:1.0];
+        cell.imageView.tintColor = [UIColor colorWithRed:139/255.0 green:92/255.0 blue:246/255.0 alpha:1.0];
+    } else {
+        // 未选中状态
+        leftBorderView.backgroundColor = [UIColor clearColor];
+        cell.backgroundColor = [UIColor systemBackgroundColor];
+        cell.textLabel.textColor = [UIColor labelColor];
+        cell.imageView.tintColor = [UIColor secondaryLabelColor];
+    }
+    
     return cell;
 }
 

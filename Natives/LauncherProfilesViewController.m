@@ -182,11 +182,46 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesTableSection) {
 
 - (void)setupProfileCell:(UITableViewCell *) cell atRow:(NSInteger)row {
     NSMutableDictionary *profile = PLProfiles.current.profiles.allValues[row];
+    
+    // 设置标题和副标题
     cell.textLabel.text = profile[@"name"];
     cell.detailTextLabel.text = profile[@"lastVersionId"];
+    
+    // 设置图标
     cell.imageView.layer.magnificationFilter = kCAFilterNearest;
-    UIImage *fallbackImage = [[UIImage imageNamed:@"DefaultProfile"] _imageWithSize:CGSizeMake(40, 40)];
+    UIImage *fallbackImage = [[UIImage imageNamed:@"DefaultProfile"] _imageWithSize:CGSizeMake(48, 48)];
     [cell.imageView setImageWithURL:[NSURL URLWithString:profile[@"icon"]] placeholderImage:fallbackImage];
+    
+    // 设置状态指示器
+    UIView *statusContainer = [[UIView alloc] init];
+    statusContainer.translatesAutoresizingMaskIntoConstraints = NO;
+    
+    UIView *statusDot = [[UIView alloc] init];
+    statusDot.translatesAutoresizingMaskIntoConstraints = NO;
+    statusDot.layer.cornerRadius = 4;
+    statusDot.backgroundColor = [UIColor systemGreenColor];
+    
+    UILabel *statusLabel = [[UILabel alloc] init];
+    statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    statusLabel.text = @"Ready to play";
+    statusLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    statusLabel.textColor = [UIColor systemGreenColor];
+    
+    [statusContainer addSubview:statusDot];
+    [statusContainer addSubview:statusLabel];
+    
+    [NSLayoutConstraint activateConstraints:@[
+        [statusDot.widthAnchor constraintEqualToConstant:8],
+        [statusDot.heightAnchor constraintEqualToConstant:8],
+        [statusDot.leadingAnchor constraintEqualToAnchor:statusContainer.leadingAnchor],
+        [statusDot.centerYAnchor constraintEqualToAnchor:statusContainer.centerYAnchor],
+        
+        [statusLabel.leadingAnchor constraintEqualToAnchor:statusDot.trailingAnchor constant:6],
+        [statusLabel.centerYAnchor constraintEqualToAnchor:statusContainer.centerYAnchor],
+        [statusLabel.trailingAnchor constraintEqualToAnchor:statusContainer.trailingAnchor]
+    ]];
+    
+    cell.accessoryView = statusContainer;
 }
 
 - (UITableViewCell *)tableView:(nonnull UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
@@ -195,13 +230,27 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesTableSection) {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellID];
     if (cell == nil) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:cellID];
-        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        cell.accessoryType = UITableViewCellAccessoryNone;
         cell.detailTextLabel.numberOfLines = 0;
         cell.detailTextLabel.lineBreakMode = NSLineBreakByWordWrapping;
+        
+        // 设置文本样式
+        cell.textLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+        cell.textLabel.textColor = [UIColor labelColor];
+        cell.detailTextLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+        cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
+        
         if (indexPath.section == kProfiles) {
-            cell.imageView.frame = CGRectMake(0, 0, 40, 40);
+            // 设置图标大小
+            cell.imageView.frame = CGRectMake(0, 0, 48, 48);
             cell.imageView.isSizeFixed = YES;
+            cell.imageView.layer.cornerRadius = 8;
+            cell.imageView.clipsToBounds = YES;
         }
+        
+        // 设置内容边距
+        cell.contentView.layoutMargins = UIEdgeInsetsMake(16, 16, 16, 16);
     } else {
         cell.imageView.image = nil;
         cell.userInteractionEnabled = YES;
@@ -212,6 +261,22 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesTableSection) {
         [self setupInstanceCell:cell atRow:indexPath.row];
     } else {
         [self setupProfileCell:cell atRow:indexPath.row];
+    }
+
+    // 设置单元格样式
+    if (indexPath.section == kProfiles) {
+        // 添加卡片效果
+        cell.backgroundColor = [UIColor systemBackgroundColor];
+        cell.layer.cornerRadius = 12;
+        cell.layer.shadowColor = [UIColor blackColor].CGColor;
+        cell.layer.shadowOffset = CGSizeMake(0, 2);
+        cell.layer.shadowRadius = 4;
+        cell.layer.shadowOpacity = 0.08;
+        cell.layer.masksToBounds = NO;
+        
+        // 添加边框
+        cell.layer.borderWidth = 1;
+        cell.layer.borderColor = [UIColor separatorColor].CGColor;
     }
 
     cell.textLabel.enabled = cell.detailTextLabel.enabled = cell.userInteractionEnabled;
