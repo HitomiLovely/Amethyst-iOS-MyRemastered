@@ -318,39 +318,41 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesCollectionSection) {
     
     NSMutableDictionary *profile = PLProfiles.current.profiles.allValues[indexPath.row];
     
-    // 设置标题和版本
-    cell.nameLabel.text = profile[@"name"];
-    cell.versionLabel.text = profile[@"lastVersionId"];
-    
-    // 设置图标
-    cell.iconImageView.layer.magnificationFilter = kCAFilterNearest;
-    UIImage *fallbackImage = [[UIImage imageNamed:@"DefaultProfile"] _imageWithSize:CGSizeMake(48, 48)];
-    [cell.iconImageView setImageWithURL:[NSURL URLWithString:profile[@"icon"]] placeholderImage:fallbackImage];
-    
-    // 设置状态
-    cell.statusLabel.text = @"Running";
-    cell.statusLabel.textColor = [UIColor systemGreenColor];
-    [cell.statusIndicator setImage:[UIImage systemImageNamed:@"play.fill"]];
-    cell.statusIndicator.tintColor = [UIColor systemGreenColor];
-    
-    // 添加渐变背景
-    CAGradientLayer *gradientLayer = [CAGradientLayer layer];
-    gradientLayer.frame = cell.contentView.bounds;
-    gradientLayer.colors = @[(__bridge id)[UIColor colorWithRed:0.0f green:0.0f blue:0.0f alpha:0.6f].CGColor, 
-                             (__bridge id)[UIColor colorWithRed:0.0f green:0.0f blue:0.0f alpha:0.8f].CGColor];
-    gradientLayer.startPoint = CGPointMake(0.5, 0.0);
-    gradientLayer.endPoint = CGPointMake(0.5, 1.0);
-    
-    // Remove existing gradient layer if any
-    for (CALayer *layer in cell.contentView.layer.sublayers) {
-        if ([layer isKindOfClass:[CAGradientLayer class]]) {
-            [layer removeFromSuperlayer];
-            break;
+    // 确保所有UI操作在主线程执行
+    dispatch_async(dispatch_get_main_queue(), ^{        // 设置标题和版本
+        cell.nameLabel.text = profile[@"name"];
+        cell.versionLabel.text = profile[@"lastVersionId"];
+        
+        // 设置图标
+        cell.iconImageView.layer.magnificationFilter = kCAFilterNearest;
+        UIImage *fallbackImage = [[UIImage imageNamed:@"DefaultProfile"] _imageWithSize:CGSizeMake(48, 48)];
+        [cell.iconImageView setImageWithURL:[NSURL URLWithString:profile[@"icon"]] placeholderImage:fallbackImage];
+        
+        // 设置状态
+        cell.statusLabel.text = @"Running";
+        cell.statusLabel.textColor = [UIColor systemGreenColor];
+        [cell.statusIndicator setImage:[UIImage systemImageNamed:@"play.fill"]];
+        cell.statusIndicator.tintColor = [UIColor systemGreenColor];
+        
+        // 添加渐变背景
+        CAGradientLayer *gradientLayer = [CAGradientLayer layer];
+        gradientLayer.frame = cell.contentView.bounds;
+        gradientLayer.colors = @[(__bridge id)[UIColor colorWithRed:0.0f green:0.0f blue:0.0f alpha:0.6f].CGColor, 
+                                 (__bridge id)[UIColor colorWithRed:0.0f green:0.0f blue:0.0f alpha:0.8f].CGColor];
+        gradientLayer.startPoint = CGPointMake(0.5, 0.0);
+        gradientLayer.endPoint = CGPointMake(0.5, 1.0);
+        
+        // Remove existing gradient layer if any
+        for (CALayer *layer in cell.contentView.layer.sublayers) {
+            if ([layer isKindOfClass:[CAGradientLayer class]]) {
+                [layer removeFromSuperlayer];
+                break;
+            }
         }
-    }
-    
-    // Insert gradient layer at the bottom
-    [cell.contentView.layer insertSublayer:gradientLayer atIndex:0];
+        
+        // Insert gradient layer at the bottom
+        [cell.contentView.layer insertSublayer:gradientLayer atIndex:0];
+    });
     
     return cell;
 }
