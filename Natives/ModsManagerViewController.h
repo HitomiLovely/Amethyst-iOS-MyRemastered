@@ -17,6 +17,10 @@ typedef NS_ENUM(NSInteger, ModsManagerMode) {
 @property (nonatomic, assign) ModsManagerMode currentMode;
 @property (nonatomic, strong) NSMutableArray *onlineSearchResults;
 
+// Private methods (exposed for build purposes)
+- (UIButton *)createTopBarButtonWithTitle:(NSString *)title;
+- (UIButton *)createSortButton;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -83,7 +83,11 @@
     if (@available(iOS 13.0, *)) {
         self.searchBar.searchTextField.backgroundColor = [UIColor colorWithRed:0.15f green:0.15f blue:0.15f alpha:1.0f];
         self.searchBar.searchTextField.textColor = [UIColor whiteColor];
-        self.searchBar.searchTextField.placeholderColor = [UIColor colorWithWhite:1.0f alpha:0.7f];
+        // 使用属性字符串来设置placeholder颜色
+        if (self.searchBar.searchTextField.placeholder) {
+            NSAttributedString *attributedPlaceholder = [[NSAttributedString alloc] initWithString:self.searchBar.searchTextField.placeholder attributes:@{NSForegroundColorAttributeName: [UIColor colorWithWhite:1.0f alpha:0.7f]}];
+            self.searchBar.searchTextField.attributedPlaceholder = attributedPlaceholder;
+        }
     }
     
     [self.view addSubview:self.searchBar];
@@ -510,9 +514,7 @@
                                                                                           message:[NSString stringWithFormat:@"%@ 已成功安装。", item.displayName]
                                                                                    preferredStyle:UIAlertControllerStyleAlert];
                     [successAlert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-                        // After user acknowledges, switch to local mods and refresh
-                        [self.modeSwitcher setSelectedSegmentIndex:0];
-                        [self modeChanged:self.modeSwitcher];
+                        // After user acknowledges, refresh local mods
                         [self refreshLocalModsList];
                     }]];
                     [self presentViewController:successAlert animated:YES completion:nil];
