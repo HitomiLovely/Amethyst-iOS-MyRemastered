@@ -3,11 +3,10 @@
 #import "ModService.h"
 #import "ModItem.h"
 #import "installer/modpack/ModrinthAPI.h"
+#import "ModDownloadPopupViewController.h"
 
-@interface ModsManagerViewController () <UITableViewDataSource, UITableViewDelegate, ModTableViewCellDelegate, UISearchBarDelegate, ModVersionViewControllerDelegate>
+@interface ModsManagerViewController () <UITableViewDataSource, UITableViewDelegate, ModTableViewCellDelegate, UISearchBarDelegate, ModVersionViewControllerDelegate, ModDownloadPopupViewControllerDelegate>
 
-// ... (all existing properties are the same)
-@property (nonatomic, strong) UISegmentedControl *modeSwitcher;
 @property (nonatomic, strong) UISearchBar *searchBar;
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) UIActivityIndicatorView *activityIndicator;
@@ -25,7 +24,6 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"管理 Mod";
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
     self.currentMode = ModsManagerModeLocal;
     self.localMods = [NSMutableArray array];
     self.filteredLocalMods = [NSMutableArray array];
@@ -35,66 +33,134 @@
 }
 
 - (void)setupUI {
-    self.modeSwitcher = [[UISegmentedControl alloc] initWithItems:@[@"本地 Mod", @"在线搜索 (Modrinth)"]];
-    self.modeSwitcher.translatesAutoresizingMaskIntoConstraints = NO;
-    self.modeSwitcher.selectedSegmentIndex = 0;
-    [self.modeSwitcher addTarget:self action:@selector(modeChanged:) forControlEvents:UIControlEventValueChanged];
-    [self.view addSubview:self.modeSwitcher];
+    // 设置背景色
+    self.view.backgroundColor = [UIColor colorWithRed:0.05f green:0.05f blue:0.05f alpha:1.0f];
+    
+    // 创建顶部操作栏容器
+    UIView *topBarContainer = [[UIView alloc] init];
+    topBarContainer.translatesAutoresizingMaskIntoConstraints = NO;
+    topBarContainer.backgroundColor = [UIColor colorWithRed:0.1f green:0.1f blue:0.1f alpha:0.8f];
+    topBarContainer.layer.borderWidth = 1.0f;
+    topBarContainer.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.1f].CGColor;
+    topBarContainer.layer.cornerRadius = 16.0f;
+    [self.view addSubview:topBarContainer];
+    
+    // 创建左侧按钮Stack
+    UIStackView *leftButtonsStack = [[UIStackView alloc] init];
+    leftButtonsStack.translatesAutoresizingMaskIntoConstraints = NO;
+    leftButtonsStack.axis = UILayoutConstraintAxisHorizontal;
+    leftButtonsStack.spacing = 32.0f;
+    [topBarContainer addSubview:leftButtonsStack];
+    
+    // 创建Download Mods按钮
+    UIButton *downloadModsButton = [self createTopBarButtonWithTitle:@"Download Mods"];
+    [downloadModsButton setTintColor:[UIColor whiteColor]];
+    [leftButtonsStack addArrangedSubview:downloadModsButton];
+    
+    // 创建Add Mod Files按钮
+    UIButton *addModFilesButton = [self createTopBarButtonWithTitle:@"Add Mod Files"];
+    [addModFilesButton setTintColor:[UIColor whiteColor]];
+    [leftButtonsStack addArrangedSubview:addModFilesButton];
+    
+    // 创建Select按钮
+    UIButton *selectButton = [self createTopBarButtonWithTitle:@"Select"];
+    [selectButton setTintColor:[UIColor whiteColor]];
+    [leftButtonsStack addArrangedSubview:selectButton];
+    
+    // 创建右侧排序按钮
+    UIButton *sortButton = [self createSortButton];
+    [topBarContainer addSubview:sortButton];
+    
+    // 创建搜索栏
     self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectZero];
     self.searchBar.translatesAutoresizingMaskIntoConstraints = NO;
     self.searchBar.delegate = self;
     self.searchBar.placeholder = @"搜索本地 Mod...";
+    self.searchBar.backgroundColor = [UIColor clearColor];
+    self.searchBar.searchBarStyle = UISearchBarStyleMinimal;
+    
+    // 适配iOS 14.0+的搜索栏样式
+    if (@available(iOS 13.0, *)) {
+        self.searchBar.searchTextField.backgroundColor = [UIColor colorWithRed:0.15f green:0.15f blue:0.15f alpha:1.0f];
+        self.searchBar.searchTextField.textColor = [UIColor whiteColor];
+        self.searchBar.searchTextField.placeholderColor = [UIColor colorWithWhite:1.0f alpha:0.7f];
+    }
+    
     [self.view addSubview:self.searchBar];
+    
+    // 创建表格视图
     self.tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     self.tableView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.tableView registerClass:[ModTableViewCell class] forCellReuseIdentifier:@"ModCell"];
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
-    self.tableView.rowHeight = 50;
+    self.tableView.rowHeight = 64.0f;
+    self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    self.tableView.backgroundColor = [UIColor clearColor];
     self.tableView.tableFooterView = [UIView new];
     [self.view addSubview:self.tableView];
+    
+    // 创建下拉刷新控件
     UIRefreshControl *rc = [UIRefreshControl new];
+    rc.tintColor = [UIColor whiteColor];
     [rc addTarget:self action:@selector(handleRefresh:) forControlEvents:UIControlEventValueChanged];
     self.tableView.refreshControl = rc;
+    
+    // 创建加载指示器
     self.activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
     self.activityIndicator.translatesAutoresizingMaskIntoConstraints = NO;
     self.activityIndicator.hidesWhenStopped = YES;
+    self.activityIndicator.tintColor = [UIColor whiteColor];
     [self.view addSubview:self.activityIndicator];
+    
+    // 创建空状态标签
     self.emptyLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     self.emptyLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.emptyLabel.textAlignment = NSTextAlignmentCenter;
-    self.emptyLabel.textColor = [UIColor secondaryLabelColor];
+    self.emptyLabel.textColor = [UIColor colorWithWhite:1.0f alpha:0.7f];
     self.emptyLabel.hidden = YES;
+    self.emptyLabel.font = [UIFont systemFontOfSize:15.0f];
     [self.view addSubview:self.emptyLabel];
-    self.refreshButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(handleRefresh:)];
-    [self updateNavigationButtons];
+    
+    // 设置约束
     [NSLayoutConstraint activateConstraints:@[
-        [self.modeSwitcher.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:8],
-        [self.modeSwitcher.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:16],
-        [self.modeSwitcher.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-16],
-        [self.searchBar.topAnchor constraintEqualToAnchor:self.modeSwitcher.bottomAnchor constant:8],
-        [self.searchBar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.searchBar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-        [self.tableView.topAnchor constraintEqualToAnchor:self.searchBar.bottomAnchor],
-        [self.tableView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor],
-        [self.tableView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.tableView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        // 顶部操作栏
+        [topBarContainer.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:8.0f],
+        [topBarContainer.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20.0f],
+        [topBarContainer.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20.0f],
+        [topBarContainer.heightAnchor constraintEqualToConstant:48.0f],
+        
+        // 左侧按钮Stack
+        [leftButtonsStack.leadingAnchor constraintEqualToAnchor:topBarContainer.leadingAnchor constant:20.0f],
+        [leftButtonsStack.centerYAnchor constraintEqualToAnchor:topBarContainer.centerYAnchor],
+        
+        // 右侧排序按钮
+        [sortButton.trailingAnchor constraintEqualToAnchor:topBarContainer.trailingAnchor constant:-20.0f],
+        [sortButton.centerYAnchor constraintEqualToAnchor:topBarContainer.centerYAnchor],
+        
+        // 搜索栏
+        [self.searchBar.topAnchor constraintEqualToAnchor:topBarContainer.bottomAnchor constant:24.0f],
+        [self.searchBar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20.0f],
+        [self.searchBar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20.0f],
+        [self.searchBar.heightAnchor constraintEqualToConstant:44.0f],
+        
+        // 表格视图
+        [self.tableView.topAnchor constraintEqualToAnchor:self.searchBar.bottomAnchor constant:24.0f],
+        [self.tableView.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-20.0f],
+        [self.tableView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20.0f],
+        [self.tableView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20.0f],
+        
+        // 加载指示器
         [self.activityIndicator.centerXAnchor constraintEqualToAnchor:self.tableView.centerXAnchor],
         [self.activityIndicator.centerYAnchor constraintEqualToAnchor:self.tableView.centerYAnchor],
+        
+        // 空状态标签
         [self.emptyLabel.centerXAnchor constraintEqualToAnchor:self.tableView.centerXAnchor],
         [self.emptyLabel.centerYAnchor constraintEqualToAnchor:self.tableView.centerYAnchor]
     ]];
 }
 
-- (void)modeChanged:(UISegmentedControl *)sender {
-    self.currentMode = (ModsManagerMode)sender.selectedSegmentIndex;
-    [self.searchBar resignFirstResponder];
-    self.searchBar.text = @"";
-    [self.onlineSearchResults removeAllObjects];
-    [self filterLocalMods];
-    [self.tableView reloadData];
-    [self updateUIForCurrentMode];
-}
+
 
 - (void)updateUIForCurrentMode {
     if (self.currentMode == ModsManagerModeLocal) {
@@ -113,11 +179,8 @@
 }
 
 - (void)updateNavigationButtons {
-    if (self.currentMode == ModsManagerModeLocal) {
-        self.navigationItem.rightBarButtonItems = @[self.refreshButton];
-    } else {
-        self.navigationItem.rightBarButtonItems = nil;
-    }
+    // 统一显示刷新按钮
+    self.navigationItem.rightBarButtonItems = @[self.refreshButton];
 }
 
 #pragma mark - Data Loading
@@ -240,6 +303,60 @@
 
 #pragma mark - UITableView DataSource & Delegate
 // ... (UITableView methods are the same)
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    return 1;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
+    return 64.0f;
+}
+
+- (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
+    // 创建表头视图
+    UIView *headerView = [[UIView alloc] init];
+    headerView.backgroundColor = [UIColor clearColor];
+    
+    // 添加自定义背景
+    UIView *backgroundView = [[UIView alloc] init];
+    backgroundView.backgroundColor = [UIColor colorWithRed:0.1f green:0.1f blue:0.1f alpha:0.8f];
+    backgroundView.layer.borderWidth = 1.0f;
+    backgroundView.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.1f].CGColor;
+    backgroundView.layer.cornerRadius = 16.0f;
+    backgroundView.frame = CGRectMake(0, 0, headerView.bounds.size.width, 64.0f);
+    [headerView addSubview:backgroundView];
+    
+    // 创建列标题数组
+    NSArray *columnTitles = @[@"Image", @"Mod Name", @"Mod version", @"Mod source", @"Last updated"];
+    
+    // 创建列标题标签
+    CGFloat padding = 24.0f;
+    CGFloat iconSize = 64.0f;
+    CGFloat labelWidth = 150.0f;
+    
+    for (int i = 0; i < columnTitles.count; i++) {
+        UILabel *label = [[UILabel alloc] init];
+        label.text = columnTitles[i];
+        label.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
+        label.textColor = [UIColor colorWithWhite:1.0f alpha:0.7f];
+        
+        if (i == 0) {
+            // Image column
+            label.frame = CGRectMake(padding, 24.0f, iconSize, 22.0f);
+        } else if (i == 1) {
+            // Mod Name column
+            label.frame = CGRectMake(padding + iconSize + 24.0f, 24.0f, 200.0f, 22.0f);
+        } else {
+            // Other columns
+            CGFloat xOffset = padding + iconSize + 24.0f + 200.0f + (i - 2) * (labelWidth + 80.0f);
+            label.frame = CGRectMake(xOffset, 24.0f, labelWidth, 22.0f);
+        }
+        
+        [headerView addSubview:label];
+    }
+    
+    return headerView;
+}
+
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     return self.currentMode == ModsManagerModeLocal ? self.filteredLocalMods.count : self.onlineSearchResults.count;
 }
@@ -316,14 +433,15 @@
     NSIndexPath *indexPath = [self.tableView indexPathForCell:cell];
     if (!indexPath || self.currentMode != ModsManagerModeOnline) return;
 
-    NSDictionary *modData = self.onlineSearchResults[indexPath.row];
-    ModItem *modItem = [[ModItem alloc] initWithOnlineData:modData];
+    // 获取所有在线Mod数据
+    NSArray *allMods = self.onlineSearchResults;
     
-    ModVersionViewController *versionVC = [[ModVersionViewController alloc] init];
-    versionVC.modItem = modItem;
-    versionVC.delegate = self;
+    // 创建并显示下载弹窗
+    ModDownloadPopupViewController *popupVC = [[ModDownloadPopupViewController alloc] init];
+    popupVC.mods = allMods;
+    popupVC.delegate = self;
     
-    [self.navigationController pushViewController:versionVC animated:YES];
+    [self presentViewController:popupVC animated:YES completion:nil];
 }
 
 #pragma mark - ModVersionViewControllerDelegate
@@ -342,6 +460,25 @@
     itemToDownload.fileName = primaryFile[@"filename"];
 
     [self startDownloadForItem:itemToDownload];
+}
+
+#pragma mark - ModDownloadPopupViewControllerDelegate
+
+- (void)modDownloadPopupViewControllerDidConfirmDownload:(NSArray *)selectedMods {
+    // 处理确认下载逻辑
+    for (NSDictionary *modData in selectedMods) {
+        ModItem *modItem = [[ModItem alloc] initWithOnlineData:modData];
+        // 这里可以添加下载逻辑
+        NSLog(@"Downloading mod: %@", modItem.displayName);
+    }
+    
+    // 显示下载成功提示
+    [self showSimpleAlertWithTitle:@"下载成功" message:[NSString stringWithFormat:@"已成功添加 %lu 个 Mod 到下载队列。", (unsigned long)selectedMods.count]];
+}
+
+- (void)modDownloadPopupViewControllerDidCancel {
+    // 处理取消逻辑
+    NSLog(@"Download canceled");
 }
 
 - (void)startDownloadForItem:(ModItem *)item {

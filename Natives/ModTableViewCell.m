@@ -18,23 +18,23 @@
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
     if (self = [super initWithStyle:style reuseIdentifier:reuseIdentifier]) {
         self.selectionStyle = UITableViewCellSelectionStyleNone;
-        self.backgroundColor = [UIColor clearColor]; // Use clear color for custom background view
-        self.contentView.backgroundColor = [UIColor systemBackgroundColor];
+        self.backgroundColor = [UIColor clearColor]; // Use clear color for custom background
+        self.contentView.backgroundColor = [UIColor clearColor];
 
         // --- Initialization of UI Elements ---
-        _modIconView = [self createImageViewWithCornerRadius:4];
-        _nameLabel = [self createLabelWithFont:[UIFont boldSystemFontOfSize:13] textColor:[UIColor labelColor] numberOfLines:1];
+    _modIconView = [self createImageViewWithCornerRadius:8];
+    _nameLabel = [self createLabelWithFont:[UIFont systemFontOfSize:15 weight:UIFontWeightMedium] textColor:[UIColor whiteColor] numberOfLines:1];
 
-        _loaderIconView = [self createImageViewWithCornerRadius:0];
+    _loaderIconView = [self createImageViewWithCornerRadius:0];
 
-        // --- NEW: Version Labels ---
-        _modVersionLabel = [self createLabelWithFont:[UIFont systemFontOfSize:10 weight:UIFontWeightMedium] textColor:[UIColor secondaryLabelColor] numberOfLines:1];
-        _gameVersionLabel = [self createLabelWithFont:[UIFont systemFontOfSize:10 weight:UIFontWeightMedium] textColor:[UIColor systemGreenColor] numberOfLines:1];
+    // --- NEW: Version Labels ---
+    _modVersionLabel = [self createLabelWithFont:[UIFont systemFontOfSize:15 weight:UIFontWeightRegular] textColor:[UIColor whiteColor] numberOfLines:1];
+    _gameVersionLabel = [self createLabelWithFont:[UIFont systemFontOfSize:12 weight:UIFontWeightMedium] textColor:[UIColor systemGreenColor] numberOfLines:1];
 
-        _authorLabel = [self createLabelWithFont:[UIFont systemFontOfSize:9] textColor:[UIColor secondaryLabelColor] numberOfLines:1];
-        _descLabel = [self createLabelWithFont:[UIFont systemFontOfSize:9] textColor:[UIColor secondaryLabelColor] numberOfLines:2];
-        _statsLabel = [self createLabelWithFont:[UIFont systemFontOfSize:9] textColor:[UIColor secondaryLabelColor] numberOfLines:1];
-        _categoryLabel = [self createLabelWithFont:[UIFont systemFontOfSize:9] textColor:[UIColor systemBlueColor] numberOfLines:1];
+    _authorLabel = [self createLabelWithFont:[UIFont systemFontOfSize:12] textColor:[UIColor colorWithWhite:1.0f alpha:0.7f] numberOfLines:1];
+    _descLabel = [self createLabelWithFont:[UIFont systemFontOfSize:12] textColor:[UIColor colorWithWhite:1.0f alpha:0.7f] numberOfLines:2];
+    _statsLabel = [self createLabelWithFont:[UIFont systemFontOfSize:12] textColor:[UIColor colorWithWhite:1.0f alpha:0.7f] numberOfLines:1];
+    _categoryLabel = [self createLabelWithFont:[UIFont systemFontOfSize:12] textColor:[UIColor colorWithRed:0.133f green:0.710f blue:1.0f alpha:1.0f] numberOfLines:1];
 
         _enableSwitch = [[UISwitch alloc] init];
         _enableSwitch.transform = CGAffineTransformMakeScale(0.75, 0.75); // Scale down for compact view
@@ -165,61 +165,57 @@
 #pragma mark - Auto Layout Constraints
 
 - (void)setupConstraints {
-    CGFloat padding = 7.0;
-    CGFloat iconSize = 36.0;
+    CGFloat padding = 24.0;
+    CGFloat iconSize = 64.0;
 
     // --- Common Left-aligned Elements ---
     [NSLayoutConstraint activateConstraints:@[
+        // Mod Icon
         [_modIconView.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:padding],
         [_modIconView.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
         [_modIconView.widthAnchor constraintEqualToConstant:iconSize],
         [_modIconView.heightAnchor constraintEqualToConstant:iconSize],
 
-        [_loaderIconView.leadingAnchor constraintEqualToAnchor:_modIconView.trailingAnchor constant:8],
-        [_loaderIconView.centerYAnchor constraintEqualToAnchor:_nameLabel.centerYAnchor],
-        [_loaderIconView.widthAnchor constraintEqualToConstant:16.0],
-        [_loaderIconView.heightAnchor constraintEqualToConstant:16.0],
+        // Mod Name
+        [_nameLabel.leadingAnchor constraintEqualToAnchor:_modIconView.trailingAnchor constant:24],
+        [_nameLabel.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:20],
+        [_nameLabel.widthAnchor constraintEqualToConstant:200],
 
-        [_nameLabel.leadingAnchor constraintEqualToAnchor:_loaderIconView.trailingAnchor constant:6],
-        [_nameLabel.topAnchor constraintEqualToAnchor:_modIconView.topAnchor constant:-2], // Shift up slightly
+        // Mod Version
+        [_modVersionLabel.leadingAnchor constraintEqualToAnchor:_nameLabel.trailingAnchor constant:80],
+        [_modVersionLabel.centerYAnchor constraintEqualToAnchor:_nameLabel.centerYAnchor],
+        [_modVersionLabel.widthAnchor constraintEqualToConstant:150],
 
-        // --- NEW: Version Label Constraints ---
-        [_modVersionLabel.leadingAnchor constraintEqualToAnchor:_nameLabel.leadingAnchor],
-        [_modVersionLabel.topAnchor constraintEqualToAnchor:_nameLabel.bottomAnchor constant:2],
-        [_gameVersionLabel.leadingAnchor constraintEqualToAnchor:_modVersionLabel.trailingAnchor constant:5],
-        [_gameVersionLabel.centerYAnchor constraintEqualToAnchor:_modVersionLabel.centerYAnchor],
+        // Game Version
+        [_gameVersionLabel.leadingAnchor constraintEqualToAnchor:_modVersionLabel.trailingAnchor constant:80],
+        [_gameVersionLabel.centerYAnchor constraintEqualToAnchor:_nameLabel.centerYAnchor],
+        [_gameVersionLabel.widthAnchor constraintEqualToConstant:150],
 
+        // Mod Source
+        [_authorLabel.leadingAnchor constraintEqualToAnchor:_gameVersionLabel.trailingAnchor constant:80],
+        [_authorLabel.centerYAnchor constraintEqualToAnchor:_nameLabel.centerYAnchor],
+        [_authorLabel.widthAnchor constraintEqualToConstant:150],
 
-        [_descLabel.leadingAnchor constraintEqualToAnchor:_nameLabel.leadingAnchor],
-        [_descLabel.topAnchor constraintEqualToAnchor:_modVersionLabel.bottomAnchor constant:2],
+        // Last Updated
+        [_statsLabel.leadingAnchor constraintEqualToAnchor:_authorLabel.trailingAnchor constant:80],
+        [_statsLabel.centerYAnchor constraintEqualToAnchor:_nameLabel.centerYAnchor],
+        [_statsLabel.widthAnchor constraintEqualToConstant:150],
 
-        [_authorLabel.leadingAnchor constraintEqualToAnchor:_nameLabel.leadingAnchor],
-        [_authorLabel.topAnchor constraintEqualToAnchor:_nameLabel.bottomAnchor constant:1],
-        [_statsLabel.leadingAnchor constraintEqualToAnchor:_authorLabel.trailingAnchor constant:4],
-        [_statsLabel.centerYAnchor constraintEqualToAnchor:_authorLabel.centerYAnchor],
-
-        // --- Right-aligned Action Buttons (Side-by-side) ---
-        [_downloadButton.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-padding],
-        [_downloadButton.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
-        [_enableSwitch.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-padding],
-        [_enableSwitch.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
-
-        [_openLinkButton.trailingAnchor constraintEqualToAnchor:_enableSwitch.leadingAnchor constant:-4],
-        [_openLinkButton.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
-        [_openLinkButton.widthAnchor constraintEqualToConstant:28],
-        [_openLinkButton.heightAnchor constraintEqualToConstant:28],
-
-        // --- Text Content Trailing Constraints ---
-        [_nameLabel.trailingAnchor constraintEqualToAnchor:_openLinkButton.leadingAnchor constant:-padding],
-        [_modVersionLabel.trailingAnchor constraintLessThanOrEqualToAnchor:_openLinkButton.leadingAnchor constant:-padding],
-        [_descLabel.trailingAnchor constraintEqualToAnchor:_openLinkButton.leadingAnchor constant:-padding],
-        [_statsLabel.trailingAnchor constraintLessThanOrEqualToAnchor:_openLinkButton.leadingAnchor constant:-padding],
-
-        // --- Loader Badges ---
-        [_loaderBadgesStackView.centerYAnchor constraintEqualToAnchor:_nameLabel.centerYAnchor],
-        [_loaderBadgesStackView.heightAnchor constraintEqualToConstant:12],
-        [_loaderBadgesStackView.leadingAnchor constraintGreaterThanOrEqualToAnchor:_nameLabel.trailingAnchor constant:4],
-        [_loaderBadgesStackView.trailingAnchor constraintEqualToAnchor:_openLinkButton.leadingAnchor constant:-4],
+        // Hide other elements not needed in the current layout
+        [_loaderIconView.widthAnchor constraintEqualToConstant:0],
+        [_loaderIconView.heightAnchor constraintEqualToConstant:0],
+        [_descLabel.widthAnchor constraintEqualToConstant:0],
+        [_descLabel.heightAnchor constraintEqualToConstant:0],
+        [_categoryLabel.widthAnchor constraintEqualToConstant:0],
+        [_categoryLabel.heightAnchor constraintEqualToConstant:0],
+        [_enableSwitch.widthAnchor constraintEqualToConstant:0],
+        [_enableSwitch.heightAnchor constraintEqualToConstant:0],
+        [_downloadButton.widthAnchor constraintEqualToConstant:0],
+        [_downloadButton.heightAnchor constraintEqualToConstant:0],
+        [_openLinkButton.widthAnchor constraintEqualToConstant:0],
+        [_openLinkButton.heightAnchor constraintEqualToConstant:0],
+        [_loaderBadgesStackView.widthAnchor constraintEqualToConstant:0],
+        [_loaderBadgesStackView.heightAnchor constraintEqualToConstant:0],
     ]];
 }
 
@@ -246,23 +242,27 @@
 }
 
 - (void)configureForLocalMode:(ModItem *)mod {
+    // 添加自定义背景视图
+    [self addCustomBackgroundView];
+    
     // Hide online/unused elements
     _authorLabel.hidden = YES;
     _statsLabel.hidden = YES;
     _categoryLabel.hidden = YES;
     _downloadButton.hidden = YES;
-    _descLabel.hidden = NO;
+    _descLabel.hidden = YES;
 
     // Show local elements
-    _openLinkButton.hidden = NO;
-    _enableSwitch.hidden = NO;
-    _loaderBadgesStackView.hidden = NO;
+    _openLinkButton.hidden = YES;
+    _enableSwitch.hidden = YES;
+    _loaderBadgesStackView.hidden = YES;
     _modVersionLabel.hidden = NO;
     _gameVersionLabel.hidden = NO;
+    _loaderIconView.hidden = YES;
 
     // Populate version labels
     if (mod.version && mod.version.length > 0) {
-        _modVersionLabel.text = [NSString stringWithFormat:@"v%@", mod.version];
+        _modVersionLabel.text = [NSString stringWithFormat:@"%@", mod.version];
         _modVersionLabel.hidden = NO;
     } else {
         _modVersionLabel.text = nil;
@@ -270,7 +270,7 @@
     }
 
     if (mod.gameVersion && mod.gameVersion.length > 0) {
-        _gameVersionLabel.text = [NSString stringWithFormat:@"MC %@", mod.gameVersion];
+        _gameVersionLabel.text = [NSString stringWithFormat:@"%@", mod.gameVersion];
         _gameVersionLabel.hidden = NO;
     } else {
         _gameVersionLabel.text = nil;
@@ -290,29 +290,42 @@
 
     [self updateToggleState:mod.disabled];
 
-    NSString *loaderName = nil;
-    if (mod.isFabric) {
-        loaderName = @"fabric";
-    } else if (mod.isForge) {
-        loaderName = @"forge";
-    } else if (mod.isNeoForge) {
-        loaderName = @"neoforge";
-    }
-    if (loaderName) {
-        _loaderIconView.image = [self loadImageWithName:loaderName];
-        _loaderIconView.hidden = NO;
-    } else {
-        _loaderIconView.image = nil;
-        _loaderIconView.hidden = YES;
-    }
-
     if (mod.modDescription && mod.modDescription.length > 0) {
         _descLabel.text = mod.modDescription;
-        _descLabel.hidden = NO;
+        _descLabel.hidden = YES;
     } else {
         _descLabel.text = nil;
         _descLabel.hidden = YES;
     }
+}
+
+- (void)addCustomBackgroundView {
+    // 移除旧的背景视图
+    for (UIView *subview in self.contentView.subviews) {
+        if ([subview tag] == 999) {
+            [subview removeFromSuperview];
+        }
+    }
+    
+    // 创建新的背景视图
+    UIView *backgroundView = [[UIView alloc] init];
+    backgroundView.translatesAutoresizingMaskIntoConstraints = NO;
+    backgroundView.backgroundColor = [UIColor colorWithRed:0.1f green:0.1f blue:0.1f alpha:0.8f];
+    backgroundView.layer.borderWidth = 1.0f;
+    backgroundView.layer.borderColor = [UIColor colorWithWhite:1.0f alpha:0.1f].CGColor;
+    backgroundView.layer.cornerRadius = 16.0f;
+    backgroundView.tag = 999;
+    
+    // 将背景视图插入到最底层
+    [self.contentView insertSubview:backgroundView atIndex:0];
+    
+    // 设置约束
+    [NSLayoutConstraint activateConstraints:@[
+        [backgroundView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:0],
+        [backgroundView.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:0],
+        [backgroundView.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:0],
+        [backgroundView.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:0]
+    ]];
 }
 
 - (void)configureForOnlineMode:(ModItem *)mod {
