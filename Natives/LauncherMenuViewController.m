@@ -58,38 +58,40 @@
     
     self.isInitialVc = YES;
     
-    // 创建应用Logo和标题
-    UIView *headerContainer = [[UIView alloc] init];
-    headerContainer.translatesAutoresizingMaskIntoConstraints = NO;
-    
-    UIImageView *appLogo = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"AppLogo"]];
-    appLogo.translatesAutoresizingMaskIntoConstraints = NO;
-    appLogo.contentMode = UIViewContentModeScaleAspectFit;
-    
-    UILabel *appTitle = [[UILabel alloc] init];
-    appTitle.translatesAutoresizingMaskIntoConstraints = NO;
-    appTitle.text = @"Amethyst";
-    appTitle.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
-    appTitle.textColor = [UIColor labelColor];
-    
-    [headerContainer addSubview:appLogo];
-    [headerContainer addSubview:appTitle];
-    
-    // 设置约束
-    [NSLayoutConstraint activateConstraints:@[
-        [appLogo.widthAnchor constraintEqualToConstant:40],
-        [appLogo.heightAnchor constraintEqualToConstant:40],
-        [appLogo.leadingAnchor constraintEqualToAnchor:headerContainer.leadingAnchor],
-        [appLogo.centerYAnchor constraintEqualToAnchor:headerContainer.centerYAnchor],
+    // 在主线程中更新UI
+    dispatch_async(dispatch_get_main_queue(), ^{        // 创建应用Logo和标题
+        UIView *headerContainer = [[UIView alloc] init];
+        headerContainer.translatesAutoresizingMaskIntoConstraints = NO;
         
-        [appTitle.leadingAnchor constraintEqualToAnchor:appLogo.trailingAnchor constant:12],
-        [appTitle.centerYAnchor constraintEqualToAnchor:headerContainer.centerYAnchor],
-        [appTitle.trailingAnchor constraintEqualToAnchor:headerContainer.trailingAnchor],
+        UIImageView *appLogo = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"AppLogo"]];
+        appLogo.translatesAutoresizingMaskIntoConstraints = NO;
+        appLogo.contentMode = UIViewContentModeScaleAspectFit;
         
-        [headerContainer.heightAnchor constraintEqualToConstant:64]
-    ]];
-    
-    self.navigationItem.titleView = headerContainer;
+        UILabel *appTitle = [[UILabel alloc] init];
+        appTitle.translatesAutoresizingMaskIntoConstraints = NO;
+        appTitle.text = @"Amethyst";
+        appTitle.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
+        appTitle.textColor = [UIColor labelColor];
+        
+        [headerContainer addSubview:appLogo];
+        [headerContainer addSubview:appTitle];
+        
+        // 设置约束
+        [NSLayoutConstraint activateConstraints:@[
+            [appLogo.widthAnchor constraintEqualToConstant:40],
+            [appLogo.heightAnchor constraintEqualToConstant:40],
+            [appLogo.leadingAnchor constraintEqualToAnchor:headerContainer.leadingAnchor],
+            [appLogo.centerYAnchor constraintEqualToAnchor:headerContainer.centerYAnchor],
+            
+            [appTitle.leadingAnchor constraintEqualToAnchor:appLogo.trailingAnchor constant:12],
+            [appTitle.centerYAnchor constraintEqualToAnchor:headerContainer.centerYAnchor],
+            [appTitle.trailingAnchor constraintEqualToAnchor:headerContainer.trailingAnchor],
+            
+            [headerContainer.heightAnchor constraintEqualToConstant:64]
+        ]];
+        
+        self.navigationItem.titleView = headerContainer;
+    });
     
     self.options = @[
         [LauncherMenuCustomItem vcClass:LauncherNewsViewController.class],

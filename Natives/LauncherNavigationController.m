@@ -45,6 +45,9 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     if ([self respondsToSelector:@selector(setNeedsUpdateOfScreenEdgesDeferringSystemGestures)]) {
         [self setNeedsUpdateOfScreenEdgesDeferringSystemGestures];
     }
+    
+    // 确保所有UI操作都在主线程执行
+    dispatch_async(dispatch_get_main_queue(), ^{
 
     // 设置工具栏样式
     self.toolbarHidden = NO;
@@ -160,8 +163,9 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     [self fetchRemoteVersionList];
     [NSNotificationCenter.defaultCenter addObserver:self
         selector:@selector(receiveNotification:) 
-        name:@"InstallModpack"
+        name:UIApplicationDidBecomeActiveNotification
         object:nil];
+    });
 
     if ([BaseAuthenticator.current isKindOfClass:MicrosoftAuthenticator.class]) {
         // Perform token refreshment on startup

@@ -183,45 +183,47 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesTableSection) {
 - (void)setupProfileCell:(UITableViewCell *) cell atRow:(NSInteger)row {
     NSMutableDictionary *profile = PLProfiles.current.profiles.allValues[row];
     
-    // 设置标题和副标题
-    cell.textLabel.text = profile[@"name"];
-    cell.detailTextLabel.text = profile[@"lastVersionId"];
-    
-    // 设置图标
-    cell.imageView.layer.magnificationFilter = kCAFilterNearest;
-    UIImage *fallbackImage = [[UIImage imageNamed:@"DefaultProfile"] _imageWithSize:CGSizeMake(48, 48)];
-    [cell.imageView setImageWithURL:[NSURL URLWithString:profile[@"icon"]] placeholderImage:fallbackImage];
-    
-    // 设置状态指示器
-    UIView *statusContainer = [[UIView alloc] init];
-    statusContainer.translatesAutoresizingMaskIntoConstraints = NO;
-    
-    UIView *statusDot = [[UIView alloc] init];
-    statusDot.translatesAutoresizingMaskIntoConstraints = NO;
-    statusDot.layer.cornerRadius = 4;
-    statusDot.backgroundColor = [UIColor systemGreenColor];
-    
-    UILabel *statusLabel = [[UILabel alloc] init];
-    statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    statusLabel.text = @"Ready to play";
-    statusLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    statusLabel.textColor = [UIColor systemGreenColor];
-    
-    [statusContainer addSubview:statusDot];
-    [statusContainer addSubview:statusLabel];
-    
-    [NSLayoutConstraint activateConstraints:@[
-        [statusDot.widthAnchor constraintEqualToConstant:8],
-        [statusDot.heightAnchor constraintEqualToConstant:8],
-        [statusDot.leadingAnchor constraintEqualToAnchor:statusContainer.leadingAnchor],
-        [statusDot.centerYAnchor constraintEqualToAnchor:statusContainer.centerYAnchor],
+    // 所有UI操作都在主线程执行
+    dispatch_async(dispatch_get_main_queue(), ^{        // 设置标题和副标题
+        cell.textLabel.text = profile[@"name"];
+        cell.detailTextLabel.text = profile[@"lastVersionId"];
         
-        [statusLabel.leadingAnchor constraintEqualToAnchor:statusDot.trailingAnchor constant:6],
-        [statusLabel.centerYAnchor constraintEqualToAnchor:statusContainer.centerYAnchor],
-        [statusLabel.trailingAnchor constraintEqualToAnchor:statusContainer.trailingAnchor]
-    ]];
-    
-    cell.accessoryView = statusContainer;
+        // 设置图标
+        cell.imageView.layer.magnificationFilter = kCAFilterNearest;
+        UIImage *fallbackImage = [[UIImage imageNamed:@"DefaultProfile"] _imageWithSize:CGSizeMake(48, 48)];
+        [cell.imageView setImageWithURL:[NSURL URLWithString:profile[@"icon"]] placeholderImage:fallbackImage];
+        
+        // 设置状态指示器
+        UIView *statusContainer = [[UIView alloc] init];
+        statusContainer.translatesAutoresizingMaskIntoConstraints = NO;
+        
+        UIView *statusDot = [[UIView alloc] init];
+        statusDot.translatesAutoresizingMaskIntoConstraints = NO;
+        statusDot.layer.cornerRadius = 4;
+        statusDot.backgroundColor = [UIColor systemGreenColor];
+        
+        UILabel *statusLabel = [[UILabel alloc] init];
+        statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        statusLabel.text = @"Ready to play";
+        statusLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+        statusLabel.textColor = [UIColor systemGreenColor];
+        
+        [statusContainer addSubview:statusDot];
+        [statusContainer addSubview:statusLabel];
+        
+        [NSLayoutConstraint activateConstraints:@[
+            [statusDot.widthAnchor constraintEqualToConstant:8],
+            [statusDot.heightAnchor constraintEqualToConstant:8],
+            [statusDot.leadingAnchor constraintEqualToAnchor:statusContainer.leadingAnchor],
+            [statusDot.centerYAnchor constraintEqualToAnchor:statusContainer.centerYAnchor],
+            
+            [statusLabel.leadingAnchor constraintEqualToAnchor:statusDot.trailingAnchor constant:6],
+            [statusLabel.centerYAnchor constraintEqualToAnchor:statusContainer.centerYAnchor],
+            [statusLabel.trailingAnchor constraintEqualToAnchor:statusContainer.trailingAnchor]
+        ]];
+        
+        cell.accessoryView = statusContainer;
+    });
 }
 
 - (UITableViewCell *)tableView:(nonnull UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
