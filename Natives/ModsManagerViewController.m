@@ -164,7 +164,53 @@
     ]];
 }
 
+- (UIButton *)createTopBarButtonWithTitle:(NSString *)title {
+    UIButton *button = [[UIButton alloc] init];
+    button.translatesAutoresizingMaskIntoConstraints = NO;
+    [button setTitle:title forState:UIControlStateNormal];
+    button.titleLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
+    return button;
+}
 
+- (UIButton *)createSortButton {
+    UIButton *button = [[UIButton alloc] init];
+    button.translatesAutoresizingMaskIntoConstraints = NO;
+    
+    // 创建水平StackView来容纳文本和图标
+    UIStackView *sortStack = [[UIStackView alloc] init];
+    sortStack.axis = UILayoutConstraintAxisHorizontal;
+    sortStack.spacing = 8.0f;
+    sortStack.alignment = UIStackViewAlignmentCenter;
+    [sortStack setTranslatesAutoresizingMaskIntoConstraints:NO];
+    [button addSubview:sortStack];
+    
+    // 添加文本标签
+    UILabel *sortLabel = [[UILabel alloc] init];
+    sortLabel.text = @"A-Z";
+    sortLabel.font = [UIFont systemFontOfSize:12.0f weight:UIFontWeightMedium];
+    sortLabel.textColor = [UIColor whiteColor];
+    [sortLabel setTranslatesAutoresizingMaskIntoConstraints:NO];
+    [sortStack addArrangedSubview:sortLabel];
+    
+    // 添加图标
+    UIImage *iconImage = [UIImage systemImageNamed:@"chevron.down"];
+    UIImageView *iconView = [[UIImageView alloc] initWithImage:iconImage];
+    iconView.tintColor = [UIColor whiteColor];
+    [iconView setTranslatesAutoresizingMaskIntoConstraints:NO];
+    [iconView.widthAnchor constraintEqualToConstant:16.0f].active = YES;
+    [iconView.heightAnchor constraintEqualToConstant:16.0f].active = YES;
+    [sortStack addArrangedSubview:iconView];
+    
+    // 设置StackView约束
+    [NSLayoutConstraint activateConstraints:@[
+        [sortStack.topAnchor constraintEqualToAnchor:button.topAnchor],
+        [sortStack.bottomAnchor constraintEqualToAnchor:button.bottomAnchor],
+        [sortStack.leadingAnchor constraintEqualToAnchor:button.leadingAnchor],
+        [sortStack.trailingAnchor constraintEqualToAnchor:button.trailingAnchor]
+    ]];
+    
+    return button;
+}
 
 - (void)updateUIForCurrentMode {
     if (self.currentMode == ModsManagerModeLocal) {
