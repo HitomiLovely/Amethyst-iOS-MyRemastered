@@ -18,7 +18,9 @@
 
 #import "ios_uikit_bridge.h"
 #import "JavaLauncher.h"
+#import "PLLogOutputView.h"
 #import "LauncherPreferences.h"
+
 #import "PLProfiles.h"
 
 #define fm NSFileManager.defaultManager
@@ -105,13 +107,23 @@ void init_loadCustomJvmFlags(int* argc, const char** argv) {
 int launchJVM(NSString *username, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
-    BOOL jit26UniversalScript = getPrefBool(@"debug.debug_universal_script_jit");
+    if (DeviceRequiresTXMWorkaround()) {
+        void *result = JIT26CreateRegionLegacy(getpagesize());
+        if ((uint32_t)result != (void *)0x690000E0) {
+            munmap(result, getpagesize());
+            // we can't continue since legacy script only allows calling breakpoint once
+            [NSFileManager.defaultManager copyItemAtPath:[NSBundle.mainBundle pathForResource:@"UniversalJIT26" ofType:@"js"] toPath:[NSString stringWithFormat:@"%s/UniversalJIT26.js", getenv("POJAV_HOME")] error:nil];
+            showDialog(localize(@"Error", nil), @"Support for legacy script has been removed. Please switch to Universal JIT script. It can be found under Amethyst's Documents directory.");
+            [PLLogOutputView handleExitCode:1];
+            return 1;
+        }
+    }
+    
     BOOL jit26AlwaysAttached = getPrefBool(@"debug.debug_always_attached_jit");
-    if(jit26UniversalScript) {
-        JIT26SendJITScript([NSString stringWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"JIT26Script" ofType:@"js"]]);
-        JIT26SetDetachAfterFirstBr(!jit26AlwaysAttached);
-        // make sure we don't get stuck in EXC_BAD_ACCESS
-        task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
+    JIT26SendJITScript([NSString stringWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"UniversalJIT26Extension" ofType:@"js"]]);
+    JIT26SetDetachAfterFirstBr(!jit26AlwaysAttached);
+    // make sure we don't get stuck in EXC_BAD_ACCESS
+    task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
     }
 
     if ([NSFileManager.defaultManager fileExistsAtPath:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"LCAppInfo.plist"]] && !@available(iOS 26.0, *)) {
