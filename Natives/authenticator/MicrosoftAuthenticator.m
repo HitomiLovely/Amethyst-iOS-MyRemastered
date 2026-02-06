@@ -258,11 +258,11 @@ typedef void(^XSTSCallback)(NSString *xsts, NSString *uhs);
         (id)kSecMatchLimit: (id)kSecMatchLimitOne,
         (id)kSecReturnData: (id)kCFBooleanTrue
     }];
-    CFTypeRef result = nil;
-    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)dict, &result);
+    CFTypeRef resultData = nil;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)dict, &resultData);
     if (status == errSecSuccess) {
         NSError *error = nil;
-        id result = [NSKeyedUnarchiver unarchivedObjectOfClasses:@[NSDictionary.class, NSString.class] fromData:(__bridge NSData *)result error:nil];
+        NSDictionary *result = [NSKeyedUnarchiver unarchivedObjectOfClasses:@[NSDictionary.class, NSString.class] fromData:(__bridge NSData *)resultData error:nil];
         if (error) {
             NSDebugLog(@"[MicrosoftAuthenticator] Failed to unarchive token data: %@", error);
         }
@@ -300,4 +300,5 @@ typedef void(^XSTSCallback)(NSString *xsts, NSString *uhs);
 }
 
 @end
+
 
