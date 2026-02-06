@@ -124,7 +124,6 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
     JIT26SetDetachAfterFirstBr(!jit26AlwaysAttached);
     // make sure we don't get stuck in EXC_BAD_ACCESS
     task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
-    }
 
     if ([NSFileManager.defaultManager fileExistsAtPath:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"LCAppInfo.plist"]] && !@available(iOS 26.0, *)) {
         NSDebugLog(@"[JavaLauncher] Running in LiveContainer, skipping dyld patch");
