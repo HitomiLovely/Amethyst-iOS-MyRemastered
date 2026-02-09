@@ -17,6 +17,7 @@
 #import "PLProfiles.h"
 #import "SurfaceViewController.h"
 #import "TrackedTextField.h"
+#import "TouchControllerBridge.h"
 #import "UIKit+hook.h"
 #import "ios_uikit_bridge.h"
 
@@ -97,7 +98,22 @@
     sendto(_sock, &packet, length, 0, (struct sockaddr *)&_target, sizeof(_target));
 }
 @end
-// --- [END] TouchController Mod Support ---
+
+// --- [START] TouchController Static Library Support ---
+// ProxyMessage 类型定义 (参考 TouchController-iOSTest)
+#define PROXY_MESSAGE_TYPE_ADD_POINTER 1
+#define PROXY_MESSAGE_TYPE_REMOVE_POINTER 2
+#define PROXY_MESSAGE_TYPE_CLEAR_POINTER 3
+#define PROXY_MESSAGE_TYPE_VIBRATE 4
+#define PROXY_MESSAGE_TYPE_INPUT_STATUS 7
+#define PROXY_MESSAGE_TYPE_INPUT_CURSOR 9
+#define PROXY_MESSAGE_TYPE_INPUT_AREA 11
+#define PROXY_MESSAGE_TYPE_MOVE_VIEW 12
+
+// Vibrate 类型
+#define VIBRATE_KIND_BLOCK_BROKEN 0
+
+// --- [END] TouchController Static Library Support ---
 
 int memorystatus_control(uint32_t command, int32_t pid, uint32_t flags, void *buffer, size_t buffersize);
 #define MEMORYSTATUS_CMD_SET_JETSAM_TASK_LIMIT        6
@@ -132,10 +148,443 @@ static GameSurfaceView* pojavWindow;
 @property(nonatomic) UIImpactFeedbackGenerator *mediumHaptic;
 
 @property(nonatomic, strong) TouchSender *touchSender;
+@property(nonatomic) long long touchControllerTransportHandle;
+
+// TouchController Text Input Support
+@property(nonatomic, strong) UITextField *touchControllerTextField;
+@property(nonatomic) BOOL touchControllerTextInputEnabled;
 
 @end
 
 @implementation SurfaceViewController
+
+#pragma mark - TouchController Static Library Support
+
+// 启动 TouchController 消息接收循环
+- (void)startTouchControllerMessageLoop {
+    // 创建定时器，每 16ms (60fps) 检查一次消息
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        while (self.touchControllerTransportHandle >= 0 && !self.isViewDismissed) {
+            @autoreleasepool {
+                NSMutableData *buffer = [NSMutableData dataWithLength:256];
+                int result = [TouchControllerBridge receiveFromTransport:self.touchControllerTransportHandle buffer:buffer];
+
+                if (result > 0) {
+                    [buffer setLength:result];
+                    [self processTouchControllerMessage:buffer];
+                }
+
+                // 休眠 16ms
+                usleep(16000);
+            }
+        }
+    });
+}
+
+// 检查视图是否已关闭
+- (BOOL)isViewDismissed {
+    return !self.view.window || self.isBeingDismissed;
+}
+
+// 编码 ProxyMessage: AddPointerMessage (type=1, index=int32, x=float, y=float)
+- (NSData *)encodeAddPointerMessage:(int32_t)index x:(float)x y:(float)y {
+    NSMutableData *data = [NSMutableData dataWithCapacity:16];
+    int32_t type = htonl(PROXY_MESSAGE_TYPE_ADD_POINTER);
+    int32_t indexBE = htonl(index);
+
+    // 将 float 转换为网络字节序
+    union { float f; uint32_t i; } ux, uy;
+    ux.f = x;
+    uy.f = y;
+    uint32_t xBE = htonl(ux.i);
+    uint32_t yBE = htonl(uy.i);
+
+    [data appendBytes:&type length:4];
+    [data appendBytes:&indexBE length:4];
+    [data appendBytes:&xBE length:4];
+    [data appendBytes:&yBE length:4];
+
+    return data;
+}
+
+// 编码 ProxyMessage: RemovePointerMessage (type=2, index=int32)
+- (NSData *)encodeRemovePointerMessage:(int32_t)index {
+    NSMutableData *data = [NSMutableData dataWithCapacity:8];
+    int32_t type = htonl(PROXY_MESSAGE_TYPE_REMOVE_POINTER);
+    int32_t indexBE = htonl(index);
+
+    [data appendBytes:&type length:4];
+    [data appendBytes:&indexBE length:4];
+
+    return data;
+}
+
+// 发送 ProxyMessage 到 TouchController 静态库
+- (void)sendTouchControllerProxyMessage:(int32_t)index x:(float)x y:(float)y isRemove:(BOOL)isRemove {
+    NSData *messageData;
+
+    if (isRemove) {
+        messageData = [self encodeRemovePointerMessage:index];
+    } else {
+        messageData = [self encodeAddPointerMessage:index x:x y:y];
+    }
+
+    if (self.touchControllerTransportHandle >= 0 && messageData) {
+        [TouchControllerBridge sendToTransport:self.touchControllerTransportHandle data:messageData];
+    }
+}
+
+#pragma mark - TouchController Text Input Support
+
+// 编码 InputStatusMessage (type=7)
+- (NSData *)encodeInputStatusMessageWithText:(NSString *)text
+                              compositionStart:(int)compositionStart
+                              compositionLength:(int)compositionLength
+                              selectionStart:(int)selectionStart
+                              selectionLength:(int)selectionLength
+                              selectionLeft:(BOOL)selectionLeft {
+    if (!text) {
+        // 无数据，只发送 type + 0
+        int32_t type = htonl(7);
+        NSMutableData *data = [NSMutableData dataWithCapacity:1];
+        [data appendBytes:&type length:4];
+        uint8_t hasData = 0;
+        [data appendBytes:&hasData length:1];
+        return data;
+    }
+
+    // 将 UTF-16 转换为 UTF-8
+    NSData *textData = [text dataUsingEncoding:NSUTF8StringEncoding];
+    const char *textBytes = (const char *)[textData bytes];
+    int textLength = (int)[textData length];
+
+    // 计算 UTF-8 位置
+    NSString *prefix = [text substringToIndex:compositionStart];
+    NSData *prefixData = [prefix dataUsingEncoding:NSUTF8StringEncoding];
+    int compositionStartUtf8 = (int)[prefixData length];
+
+    NSString *compSegment = [text substringWithRange:NSMakeRange(compositionStart, compositionLength)];
+    NSData *compData = [compSegment dataUsingEncoding:NSUTF8StringEncoding];
+    int compositionLengthUtf8 = (int)[compData length];
+
+    NSString *selPrefix = [text substringToIndex:selectionStart];
+    NSData *selPrefixData = [selPrefix dataUsingEncoding:NSUTF8StringEncoding];
+    int selectionStartUtf8 = (int)[selPrefixData length];
+
+    NSString *selSegment = [text substringWithRange:NSMakeRange(selectionStart, selectionLength)];
+    NSData *selData = [selSegment dataUsingEncoding:NSUTF8StringEncoding];
+    int selectionLengthUtf8 = (int)[selData length];
+
+    // 编码消息
+    NSMutableData *data = [NSMutableData dataWithCapacity:5 + textLength + 17];
+    int32_t type = htonl(7);
+    [data appendBytes:&type length:4];
+
+    uint8_t hasDataFlag = 1;
+    [data appendBytes:&hasDataFlag length:1];
+
+    int32_t textLengthBE = htonl(textLength);
+    [data appendBytes:&textLengthBE length:4];
+    [data appendBytes:textBytes length:textLength];
+
+    int32_t compStartBE = htonl(compositionStartUtf8);
+    int32_t compLenBE = htonl(compositionLengthUtf8);
+    [data appendBytes:&compStartBE length:4];
+    [data appendBytes:&compLenBE length:4];
+
+    int32_t selStartBE = htonl(selectionStartUtf8);
+    int32_t selLenBE = htonl(selectionLengthUtf8);
+    [data appendBytes:&selStartBE length:4];
+    [data appendBytes:&selLenBE length:4];
+
+    uint8_t selectionLeftFlag = selectionLeft ? 1 : 0;
+    [data appendBytes:&selectionLeftFlag length:1];
+
+    return data;
+}
+
+// 编码 InputCursorMessage (type=9)
+- (NSData *)encodeInputCursorMessageWithRect:(CGRect)rect {
+    NSMutableData *data = [NSMutableData dataWithCapacity:17];
+    int32_t type = htonl(9);
+    [data appendBytes:&type length:4];
+
+    uint8_t hasData = 1;
+    [data appendBytes:&hasData length:1];
+
+    union { float f; uint32_t i; } left, top, width, height;
+    left.f = rect.origin.x;
+    top.f = rect.origin.y;
+    width.f = rect.size.width;
+    height.f = rect.size.height;
+
+    uint32_t leftBE = htonl(left.i);
+    uint32_t topBE = htonl(top.i);
+    uint32_t widthBE = htonl(width.i);
+    uint32_t heightBE = htonl(height.i);
+
+    [data appendBytes:&leftBE length:4];
+    [data appendBytes:&topBE length:4];
+    [data appendBytes:&widthBE length:4];
+    [data appendBytes:&heightBE length:4];
+
+    return data;
+}
+
+// 编码 InputAreaMessage (type=11)
+- (NSData *)encodeInputAreaMessageWithRect:(CGRect)rect {
+    NSMutableData *data = [NSMutableData dataWithCapacity:17];
+    int32_t type = htonl(11);
+    [data appendBytes:&type length:4];
+
+    uint8_t hasData = 1;
+    [data appendBytes:&hasData length:1];
+
+    union { float f; uint32_t i; } left, top, width, height;
+    left.f = rect.origin.x;
+    top.f = rect.origin.y;
+    width.f = rect.size.width;
+    height.f = rect.size.height;
+
+    uint32_t leftBE = htonl(left.i);
+    uint32_t topBE = htonl(top.i);
+    uint32_t widthBE = htonl(width.i);
+    uint32_t heightBE = htonl(height.i);
+
+    [data appendBytes:&leftBE length:4];
+    [data appendBytes:&topBE length:4];
+    [data appendBytes:&widthBE length:4];
+    [data appendBytes:&heightBE length:4];
+
+    return data;
+}
+
+// 发送文本输入状态到 TouchController
+- (void)sendTextInputStatus {
+    if (self.touchControllerTransportHandle < 0) return;
+
+    NSString *text = self.touchControllerTextField.text ?: @"";
+    UITextRange *selectedRange = self.touchControllerTextField.selectedTextRange;
+    NSInteger selectionStart = [self.touchControllerTextField offsetFromPosition:self.touchControllerTextField.beginningOfDocument
+                                                                  toPosition:selectedRange.start];
+    NSInteger selectionLength = [self.touchControllerTextField offsetFromPosition:selectedRange.start
+                                                                    toPosition:selectedRange.end];
+
+    NSData *messageData = [self encodeInputStatusMessageWithText:text
+                                              compositionStart:0
+                                              compositionLength:0
+                                              selectionStart:(int)selectionStart
+                                              selectionLength:(int)selectionLength
+                                              selectionLeft:NO];
+
+    [TouchControllerBridge sendToTransport:self.touchControllerTransportHandle data:messageData];
+}
+
+// 发送光标位置信息
+- (void)sendInputCursorWithRect:(CGRect)rect {
+    if (self.touchControllerTransportHandle < 0) return;
+
+    NSData *messageData = [self encodeInputCursorMessageWithRect:rect];
+    [TouchControllerBridge sendToTransport:self.touchControllerTransportHandle data:messageData];
+}
+
+// 发送输入区域信息
+- (void)sendInputAreaWithRect:(CGRect)rect {
+    if (self.touchControllerTransportHandle < 0) return;
+
+    NSData *messageData = [self encodeInputAreaMessageWithRect:rect];
+    [TouchControllerBridge sendToTransport:self.touchControllerTransportHandle data:messageData];
+}
+
+#pragma mark - TouchController Vibration Support
+
+// 编码 VibrateMessage (type=4)
+- (NSData *)encodeVibrateMessageWithKind:(int32_t)kind {
+    NSMutableData *data = [NSMutableData dataWithCapacity:8];
+    int32_t type = htonl(PROXY_MESSAGE_TYPE_VIBRATE);
+    int32_t kindBE = htonl(kind);
+
+    [data appendBytes:&type length:4];
+    [data appendBytes:&kindBE length:4];
+
+    return data;
+}
+
+// 触发震动反馈
+- (void)triggerVibrationWithKind:(int32_t)kind {
+    // 检查震动是否启用
+    if (!getPrefBool(@"control.mod_touch_vibrate_enable")) {
+        return;
+    }
+
+    // 获取震动强度设置
+    NSInteger intensity = [getPrefObject(@"control.mod_touch_vibrate_intensity") integerValue];
+    if (intensity < 1) intensity = 1;
+    if (intensity > 3) intensity = 3;
+
+    // 使用 UIImpactFeedbackGenerator 触发震动
+    UIImpactFeedbackGenerator *feedbackGenerator;
+    switch (intensity) {
+        case 1: // 轻度震动
+            feedbackGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+            break;
+        case 2: // 中度震动
+            feedbackGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+            break;
+        case 3: // 重度震动
+            feedbackGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleHeavy];
+            break;
+        default:
+            feedbackGenerator = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+            break;
+    }
+
+    [feedbackGenerator impactOccurred];
+
+    // 同时发送 VibrateMessage 到 TouchController
+    if (self.touchControllerTransportHandle >= 0) {
+        NSData *messageData = [self encodeVibrateMessageWithKind:kind];
+        [TouchControllerBridge sendToTransport:self.touchControllerTransportHandle data:messageData];
+    }
+}
+
+#pragma mark - TouchController MoveView Support
+
+// 编码 MoveViewMessage (type=12)
+- (NSData *)encodeMoveViewMessageWithScreenBased:(BOOL)screenBased
+                                     deltaPitch:(float)deltaPitch
+                                      deltaYaw:(float)deltaYaw {
+    NSMutableData *data = [NSMutableData dataWithCapacity:13];
+    int32_t type = htonl(PROXY_MESSAGE_TYPE_MOVE_VIEW);
+    uint8_t screenBasedByte = screenBased ? 1 : 0;
+
+    // 将 float 转换为网络字节序
+    union { float f; uint32_t i; } up, uy;
+    up.f = deltaPitch;
+    uy.f = deltaYaw;
+    uint32_t pitchBE = htonl(up.i);
+    uint32_t yawBE = htonl(uy.i);
+
+    [data appendBytes:&type length:4];
+    [data appendBytes:&screenBasedByte length:1];
+    [data appendBytes:&pitchBE length:4];
+    [data appendBytes:&yawBE length:4];
+
+    return data;
+}
+
+// 发送移动视角消息
+- (void)sendMoveViewWithDeltaPitch:(float)deltaPitch deltaYaw:(float)deltaYaw {
+    if (self.touchControllerTransportHandle >= 0) {
+        NSData *messageData = [self encodeMoveViewMessageWithScreenBased:YES
+                                                              deltaPitch:deltaPitch
+                                                               deltaYaw:deltaYaw];
+        [TouchControllerBridge sendToTransport:self.touchControllerTransportHandle data:messageData];
+    }
+}
+
+#pragma mark - TouchController Message Receiver
+
+// 处理从 TouchController 接收到的消息
+- (void)processTouchControllerMessage:(NSData *)messageData {
+    if (messageData.length < 4) {
+        NSLog(@"[TouchController] Message too short: %lu bytes", (unsigned long)messageData.length);
+        return;
+    }
+
+    int32_t type;
+    [messageData getBytes:&type length:4];
+    type = ntohl(type);
+
+    switch (type) {
+        case PROXY_MESSAGE_TYPE_VIBRATE: {
+            if (messageData.length >= 8) {
+                int32_t kind;
+                [messageData getBytes:&kind range:NSMakeRange(4, 4)];
+                kind = ntohl(kind);
+                [self triggerVibrationWithKind:kind];
+            }
+            break;
+        }
+        case PROXY_MESSAGE_TYPE_MOVE_VIEW: {
+            if (messageData.length >= 13) {
+                uint8_t screenBasedByte;
+                int32_t pitchBE, yawBE;
+                [messageData getBytes:&screenBasedByte range:NSMakeRange(4, 1)];
+                [messageData getBytes:&pitchBE range:NSMakeRange(5, 4)];
+                [messageData getBytes:&yawBE range:NSMakeRange(9, 4)];
+
+                BOOL screenBased = (screenBasedByte != 0);
+                union { uint32_t i; float f; } up, uy;
+                up.i = ntohl(pitchBE);
+                uy.i = ntohl(yawBE);
+
+                // MoveView 消息通常是从客户端发送到服务端的
+                // 这里我们记录日志，实际应用可能需要特殊处理
+                NSLog(@"[TouchController] Received MoveView: screenBased=%d, pitch=%.2f, yaw=%.2f",
+                      screenBased, up.f, uy.f);
+            }
+            break;
+        }
+        default:
+            NSLog(@"[TouchController] Unknown message type: %d", type);
+            break;
+    }
+}
+
+// 初始化文本输入字段
+- (void)setupTouchControllerTextInput {
+    if (!self.touchControllerTextField) {
+        self.touchControllerTextField = [[UITextField alloc] initWithFrame:CGRectZero];
+        self.touchControllerTextField.hidden = YES;
+        self.touchControllerTextField.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        self.touchControllerTextField.autocorrectionType = UITextAutocorrectionTypeNo;
+        self.touchControllerTextField.keyboardType = UIKeyboardTypeDefault;
+        [self.view addSubview:self.touchControllerTextField];
+
+        // 添加文本变化监听
+        [self.touchControllerTextField addTarget:self
+                                          action:@selector(textFieldDidChange:)
+                                forControlEvents:UIControlEventEditingChanged];
+    }
+}
+
+// 处理文本变化
+- (void)textFieldDidChange:(UITextField *)textField {
+    [self sendTextInputStatus];
+}
+
+// 显示文本输入界面
+- (void)showTouchControllerTextInput {
+    if (!self.touchControllerTextInputEnabled) return;
+
+    [self setupTouchControllerTextInput];
+    self.touchControllerTextField.hidden = NO;
+    [self.touchControllerTextField becomeFirstResponder];
+
+    // 发送输入区域信息
+    [self sendInputAreaWithRect:self.touchControllerTextField.frame];
+
+    // 发送初始文本状态
+    [self sendTextInputStatus];
+}
+
+// 隐藏文本输入界面
+- (void)hideTouchControllerTextInput {
+    [self.touchControllerTextField resignFirstResponder];
+    self.touchControllerTextField.hidden = YES;
+
+    // 发送空状态以关闭输入
+    NSData *messageData = [self encodeInputStatusMessageWithText:nil
+                                              compositionStart:0
+                                              compositionLength:0
+                                              selectionStart:0
+                                              selectionLength:0
+                                              selectionLeft:NO];
+    [TouchControllerBridge sendToTransport:self.touchControllerTransportHandle data:messageData];
+}
+
+#pragma mark - Initialization
 
 - (instancetype)initWithMetadata:(NSDictionary *)metadata {
     self = [super init];
@@ -314,6 +763,34 @@ static GameSurfaceView* pojavWindow;
     }
     
     self.touchSender = [[TouchSender alloc] init];
+
+    // 初始化 TouchController 静态库 Transport
+    if (getPrefBool(@"control.mod_touch_enable")) {
+        NSInteger mode = [getPrefObject(@"control.mod_touch_mode") integerValue];
+        if (mode == 2 && [TouchControllerBridge isTouchControllerAvailable]) {
+            // 静态库模式：创建 Transport
+            self.touchControllerTransportHandle = [TouchControllerBridge createTransportWithName:@"/tmp/touchcontroller.sock"];
+            if (self.touchControllerTransportHandle < 0) {
+                NSLog(@"[TouchController] Failed to create transport for static library mode");
+            } else {
+                NSLog(@"[TouchController] Transport created successfully (handle: %lld)", self.touchControllerTransportHandle);
+            }
+        } else {
+            self.touchControllerTransportHandle = -1;
+        }
+    } else {
+        self.touchControllerTransportHandle = -1;
+    }
+
+    // 初始化 TouchController 文本输入支持
+    if (self.touchControllerTransportHandle >= 0) {
+        self.touchControllerTextInputEnabled = YES;
+        [self setupTouchControllerTextInput];
+        NSLog(@"[TouchController] Text input support initialized");
+
+        // 启动消息接收定时器
+        [self startTouchControllerMessageLoop];
+    }
 
     [self launchMinecraft];
 }
@@ -960,27 +1437,40 @@ static GameSurfaceView* pojavWindow;
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
 {
-    
+
     [super touchesBegan:touches withEvent:event];
 
     if (getPrefBool(@"control.mod_touch_enable")) {
-        
-        for (UITouch *touch in touches) {
-            if (touch.view != self.surfaceView) continue;
-            
-            CGPoint p = [touch locationInView:self.surfaceView];
-            float x = p.x / self.surfaceView.frame.size.width;
-            float y = p.y / self.surfaceView.frame.size.height;
-            // Send Type 1 (Add Pointer)
-            [self.touchSender sendType:1 id:[self getFingerId:touch] x:x y:y];
+        NSInteger mode = [getPrefObject(@"control.mod_touch_mode") integerValue];
+
+        if (mode == 1) {  // UDP 模式
+            for (UITouch *touch in touches) {
+                if (touch.view != self.surfaceView) continue;
+
+                CGPoint p = [touch locationInView:self.surfaceView];
+                float x = p.x / self.surfaceView.frame.size.width;
+                float y = p.y / self.surfaceView.frame.size.height;
+                // Send Type 1 (Add Pointer)
+                [self.touchSender sendType:1 id:[self getFingerId:touch] x:x y:y];
+            }
+        } else if (mode == 2) {  // 静态库模式
+            for (UITouch *touch in touches) {
+                if (touch.view != self.surfaceView) continue;
+
+                CGPoint p = [touch locationInView:self.surfaceView];
+                float x = p.x / self.surfaceView.frame.size.width;
+                float y = p.y / self.surfaceView.frame.size.height;
+                // Send ProxyMessage: AddPointerMessage
+                [self sendTouchControllerProxyMessage:[self getFingerId:touch] x:x y:y isRemove:NO];
+            }
         }
-        
+
         if (isGrabbing == JNI_TRUE) return;
     }
 
-    
+
     for (UITouch *touch in touches) {
-        if (touch.type == UITouchTypeIndirectPointer) continue; 
+        if (touch.type == UITouchTypeIndirectPointer) continue;
         CGPoint locationInView = [touch locationInView:self.rootView];
         CGFloat screenScale = [[UIScreen mainScreen] scale];
         currentHotbarSlot = self.enableHotbarGestures ?
@@ -999,15 +1489,30 @@ static GameSurfaceView* pojavWindow;
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
 {
     if (getPrefBool(@"control.mod_touch_enable")) {
-        for (UITouch *touch in touches) {
-            if (touch.view != self.surfaceView) continue;
+        NSInteger mode = [getPrefObject(@"control.mod_touch_mode") integerValue];
 
-            CGPoint p = [touch locationInView:self.surfaceView];
-            float x = p.x / self.surfaceView.frame.size.width;
-            float y = p.y / self.surfaceView.frame.size.height;
-            // Send Type 1 (Move Pointer)
-            [self.touchSender sendType:1 id:[self getFingerId:touch] x:x y:y];
+        if (mode == 1) {  // UDP 模式
+            for (UITouch *touch in touches) {
+                if (touch.view != self.surfaceView) continue;
+
+                CGPoint p = [touch locationInView:self.surfaceView];
+                float x = p.x / self.surfaceView.frame.size.width;
+                float y = p.y / self.surfaceView.frame.size.height;
+                // Send Type 1 (Move Pointer)
+                [self.touchSender sendType:1 id:[self getFingerId:touch] x:x y:y];
+            }
+        } else if (mode == 2) {  // 静态库模式
+            for (UITouch *touch in touches) {
+                if (touch.view != self.surfaceView) continue;
+
+                CGPoint p = [touch locationInView:self.surfaceView];
+                float x = p.x / self.surfaceView.frame.size.width;
+                float y = p.y / self.surfaceView.frame.size.height;
+                // Send ProxyMessage: AddPointerMessage (Move is also Add with new position)
+                [self sendTouchControllerProxyMessage:[self getFingerId:touch] x:x y:y isRemove:NO];
+            }
         }
+
         if (isGrabbing == JNI_TRUE) return;
     }
 
@@ -1019,7 +1524,7 @@ static GameSurfaceView* pojavWindow;
                 CGPoint point = [touch locationInView:self.rootView];
                 [self sendTouchPoint:point withEvent:ACTION_MOVE];
             }
-            continue; 
+            continue;
         }
         if (self.hotbarTouch != touch && [self isTouchInactive:self.primaryTouch]) {
             self.primaryTouch = touch;
@@ -1032,13 +1537,23 @@ static GameSurfaceView* pojavWindow;
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
 {
     if (getPrefBool(@"control.mod_touch_enable")) {
-        for (UITouch *touch in touches) {
-            // Send Type 2 (Remove Pointer) for ANY touch ending
-            [self.touchSender sendType:2 id:[self getFingerId:touch] x:0 y:0];
+        NSInteger mode = [getPrefObject(@"control.mod_touch_mode") integerValue];
+
+        if (mode == 1) {  // UDP 模式
+            for (UITouch *touch in touches) {
+                // Send Type 2 (Remove Pointer) for ANY touch ending
+                [self.touchSender sendType:2 id:[self getFingerId:touch] x:0 y:0];
+            }
+        } else if (mode == 2) {  // 静态库模式
+            for (UITouch *touch in touches) {
+                // Send ProxyMessage: RemovePointerMessage
+                [self sendTouchControllerProxyMessage:[self getFingerId:touch] x:0 y:0 isRemove:YES];
+            }
         }
+
         if (isGrabbing == JNI_TRUE) return;
     }
-    
+
     [super touchesEnded:touches withEvent:event];
     [self touchesEndedGlobal:touches withEvent:event];
 }
@@ -1046,9 +1561,18 @@ static GameSurfaceView* pojavWindow;
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
 {
     if (getPrefBool(@"control.mod_touch_enable")) {
-        for (UITouch *touch in touches) {
-             [self.touchSender sendType:2 id:[self getFingerId:touch] x:0 y:0];
+        NSInteger mode = [getPrefObject(@"control.mod_touch_mode") integerValue];
+
+        if (mode == 1) {  // UDP 模式
+            for (UITouch *touch in touches) {
+                [self.touchSender sendType:2 id:[self getFingerId:touch] x:0 y:0];
+            }
+        } else if (mode == 2) {  // 静态库模式
+            for (UITouch *touch in touches) {
+                [self sendTouchControllerProxyMessage:[self getFingerId:touch] x:0 y:0 isRemove:YES];
+            }
         }
+
         if (isGrabbing == JNI_TRUE) return;
     }
 
