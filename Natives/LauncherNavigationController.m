@@ -17,7 +17,6 @@
 #import "UIKit+hook.h"
 #import "ios_uikit_bridge.h"
 #import "utils.h"
-#import "installer/modpack/ModrinthAPI.h"
 
 #include <sys/time.h>
 
@@ -48,10 +47,9 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     if ([self respondsToSelector:@selector(setNeedsUpdateOfScreenEdgesDeferringSystemGestures)]) {
         [self setNeedsUpdateOfScreenEdgesDeferringSystemGestures];
     }
-
     UIToolbar *targetToolbar = self.toolbar;
     BOOL hasLiquidGlass = _UISolariumEnabled && _UISolariumEnabled();
-
+    
     if(hasLiquidGlass) {
         self.versionTextField = [[PickTextField alloc] initWithFrame:CGRectMake(0, 0, MIN(self.view.frame.size.width,self.view.frame.size.height)*0.75, 36)];
     } else {
@@ -110,30 +108,16 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         [targetToolbar addSubview:self.versionTextField];
         [targetToolbar addSubview:self.buttonInstall];
     }
-
+    
     self.progressViewMain.autoresizingMask = AUTORESIZE_MASKS;
     self.progressViewMain.hidden = YES;
-    [targetToolbar addSubview:self.progressViewMain];
-
-    self.buttonInstall = [UIButton buttonWithType:UIButtonTypeSystem];
-    setButtonPointerInteraction(self.buttonInstall);
-    [self.buttonInstall setTitle:localize(@"Play", nil) forState:UIControlStateNormal];
-    self.buttonInstall.autoresizingMask = AUTORESIZE_MASKS;
-    self.buttonInstall.backgroundColor = [UIColor colorWithRed:121/255.0 green:56/255.0 blue:162/255.0 alpha:1.0];
-    self.buttonInstall.layer.cornerRadius = 5;
-    self.buttonInstall.frame = CGRectMake(self.toolbar.frame.size.width * 0.8, 4, self.toolbar.frame.size.width * 0.2, self.toolbar.frame.size.height - 8);
-    self.buttonInstall.tintColor = UIColor.whiteColor;
-    self.buttonInstall.enabled = NO;
-    [self.buttonInstall addTarget:self action:@selector(performInstallOrShowDetails:) forControlEvents:UIControlEventPrimaryActionTriggered];
-    [targetToolbar addSubview:self.buttonInstall];
-
     self.progressText = [[UILabel alloc] initWithFrame:self.versionTextField.frame];
     self.progressText.adjustsFontSizeToFitWidth = YES;
     self.progressText.autoresizingMask = AUTORESIZE_MASKS;
     self.progressText.font = [self.progressText.font fontWithSize:16];
     self.progressText.textAlignment = NSTextAlignmentCenter;
     self.progressText.userInteractionEnabled = NO;
-
+    
     if(hasLiquidGlass) {
         [textFieldContainer addSubview:self.progressText];
     } else {
@@ -202,20 +186,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     ].mutableCopy;
 
     AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
-    // 配置响应序列化器以接受application/octet-stream
-    AFJSONResponseSerializer *serializer = [AFJSONResponseSerializer serializer];
-    [serializer setAcceptableContentTypes:[NSSet setWithObjects:@"application/json", @"text/json", @"text/javascript", @"application/octet-stream", nil]];
-    manager.responseSerializer = serializer;
-    NSString *downloadSource = getPrefObject(@"general.download_source");
-    NSString *versionManifestURL;
-    
-    if ([downloadSource isEqualToString:@"bmclapi"]) {
-        versionManifestURL = @"https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json";
-    } else {
-        versionManifestURL = @"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
-    }
-    
-    [manager GET:versionManifestURL parameters:nil headers:nil progress:^(NSProgress * _Nonnull progress) {
+    [manager GET:@"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json" parameters:nil headers:nil progress:^(NSProgress * _Nonnull progress) {
         self.progressViewMain.progress = progress.fractionCompleted;
     } success:^(NSURLSessionTask *task, NSDictionary *responseObject) {
         [remoteVersionList addObjectsFromArray:responseObject[@"versions"]];
@@ -267,8 +238,6 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     [self presentViewController:documentPicker animated:YES completion:nil];
 }
 
-
-
 - (void)enterModInstallerWithPath:(NSString *)path hitEnterAfterWindowShown:(BOOL)hitEnter {
     JavaGUIViewController *vc = [[JavaGUIViewController alloc] init];
     vc.filepath = path;
@@ -284,7 +253,6 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 }
 
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentAtURL:(NSURL *)url {
-    // Handle normal jar file import
     [self enterModInstallerWithPath:url.path hitEnterAfterWindowShown:NO];
 }
 
@@ -398,7 +366,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         self.progressText.text = progress.localizedAdditionalDescription;
 
         if (!progress.finished) return;
-        [self.progressVC dismissViewControllerAnimated:NO completion:nil];
+        [self.progressVC dismissModalViewControllerAnimated:NO];
 
         self.progressViewMain.observedProgress = nil;
         if (self.task.metadata) {
@@ -406,10 +374,10 @@ static void *ProgressObserverContext = &ProgressObserverContext;
                 UIKit_launchMinecraftSurfaceVC(self.view.window, self.task.metadata);
             }];
         } else {
-            self.task = nil;
-            [self setInteractionEnabled:YES forDownloading:YES];
             [self reloadProfileList];
         }
+        self.task = nil;
+        [self setInteractionEnabled:YES forDownloading:YES];
     });
 }
 
