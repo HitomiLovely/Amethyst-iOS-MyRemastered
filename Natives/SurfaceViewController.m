@@ -31,6 +31,8 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <string.h>
 
 #define TC_MOD_PORT 12450
 
@@ -50,6 +52,12 @@
         if (_sock < 0) {
             NSLog(@"[TouchController] Error: Failed to create socket");
         } else {
+            // Increase send buffer size to reduce packet loss
+            int sendBufSize = 256 * 1024; // 256KB
+            if (setsockopt(_sock, SOL_SOCKET, SO_SNDBUF, &sendBufSize, sizeof(sendBufSize)) < 0) {
+                NSLog(@"[TouchController] Warning: Failed to set send buffer size: %s", strerror(errno));
+            }
+
             // Non-blocking mode
             int flags = fcntl(_sock, F_GETFL, 0);
             fcntl(_sock, F_SETFL, flags | O_NONBLOCK);
@@ -95,7 +103,37 @@
     
     size_t length = (type == 2) ? 8 : 16;
 
-    sendto(_sock, &packet, length, 0, (struct sockaddr *)&_target, sizeof(_target));
+    // 优化重试机制：减少重试次数，避免不必要的延迟
+    int maxRetries = (type == 2) ? 2 : 1;
+    int retry;
+    ssize_t sent = -1;
+
+    for (retry = 0; retry < maxRetries; retry++) {
+        sent = sendto(_sock, &packet, length, 0, (struct sockaddr *)&_target, sizeof(_target));
+        if (sent == length) {
+            // 发送成功
+            break;
+        } else if (sent < 0) {
+            int err = errno;
+            if (err == EAGAIN || err == EWOULDBLOCK) {
+                // 缓冲区满，短暂休眠后重试
+                usleep(500); // 减少休眠时间到0.5毫秒
+                continue;
+            } else {
+                // 其他错误，记录并退出重试
+                NSLog(@"[TouchController] Error: sendto failed: %s (type=%d, id=%d)", strerror(err), type, fingerId);
+                break;
+            }
+        } else {
+            // 部分发送（理论上不会发生），记录并重试
+            NSLog(@"[TouchController] Warning: partial send: %zd of %zu bytes", sent, length);
+            usleep(500); // 减少休眠时间到0.5毫秒
+        }
+    }
+
+    if (sent != length) {
+        NSLog(@"[TouchController] Error: failed to send packet after %d retries (type=%d, id=%d)", maxRetries, type, fingerId);
+    }
 }
 @end
 
@@ -1120,7 +1158,7 @@ static GameSurfaceView* pojavWindow;
     }
 
     if (touchEvent == self.primaryTouch) {
-        if ([self isTouchInactive:self.primaryTouch]) return; 
+        if ([self isTouchInactive:self.primaryTouch] && event != ACTION_UP) return; 
         if (event == ACTION_MOVE && isGrabbing) {
             event = ACTION_MOVE_MOTION;
             CGPoint prevLocationInView = [touchEvent previousLocationInView:self.rootView];
@@ -1437,8 +1475,49 @@ static GameSurfaceView* pojavWindow;
 
 #pragma mark - Input: On-screen touch events (TouchController Mod Integration)
 
+static int32_t s_fingerIdCounter = 0;
+static NSMutableDictionary *s_touchToFingerIdMap = nil;
+
 - (int32_t)getFingerId:(UITouch *)touch {
-    return (int32_t)((long)touch % 100000);
+    // Lazy initialize the map
+    if (!s_touchToFingerIdMap) {
+        s_touchToFingerIdMap = [NSMutableDictionary dictionary];
+    }
+    
+    // Use touch pointer address as key (UITouch doesn't support NSCopying)
+    NSString *touchKey = [NSString stringWithFormat:@"%p", touch];
+    
+    // Check if we already have a finger ID for this touch
+    NSNumber *fingerIdNum = [s_touchToFingerIdMap objectForKey:touchKey];
+    if (fingerIdNum) {
+        return [fingerIdNum intValue];
+    }
+    
+    // Generate a new unique finger ID
+    s_fingerIdCounter = (s_fingerIdCounter + 1) % 100000;
+    int32_t newFingerId = s_fingerIdCounter;
+    
+    // Store the mapping
+    [s_touchToFingerIdMap setObject:@(newFingerId) forKey:touchKey];
+    
+    return newFingerId;
+}
+
+// Clear the touch to finger ID map when touches end
+- (void)clearTouchToFingerIdMapForTouches:(NSSet *)touches {
+    if (!s_touchToFingerIdMap) return;
+    
+    for (UITouch *touch in touches) {
+        NSString *touchKey = [NSString stringWithFormat:@"%p", touch];
+        [s_touchToFingerIdMap removeObjectForKey:touchKey];
+    }
+}
+
+// Clear all touch to finger ID mappings
+- (void)clearAllTouchToFingerIdMappings {
+    if (s_touchToFingerIdMap) {
+        [s_touchToFingerIdMap removeAllObjects];
+    }
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
@@ -1488,7 +1567,6 @@ static GameSurfaceView* pojavWindow;
             self.primaryTouch = touch;
         }
         [self sendTouchEvent:touch withUIEvent:event withEvent:ACTION_DOWN];
-        break;
     }
 }
 
@@ -1547,15 +1625,20 @@ static GameSurfaceView* pojavWindow;
 
         if (mode == 1) {  // UDP 模式
             for (UITouch *touch in touches) {
-                // Send Type 2 (Remove Pointer) for ANY touch ending
+                if (touch.view != self.surfaceView) continue;
+                // Send Type 2 (Remove Pointer) for surfaceView touch ending
                 [self.touchSender sendType:2 id:[self getFingerId:touch] x:0 y:0];
             }
         } else if (mode == 2) {  // 静态库模式
             for (UITouch *touch in touches) {
+                if (touch.view != self.surfaceView) continue;
                 // Send ProxyMessage: RemovePointerMessage
                 [self sendTouchControllerProxyMessage:[self getFingerId:touch] x:0 y:0 isRemove:YES];
             }
         }
+
+        // Clear the touch to finger ID map for ended touches
+        [self clearTouchToFingerIdMapForTouches:touches];
 
         if (isGrabbing == JNI_TRUE) return;
     }
@@ -1571,13 +1654,18 @@ static GameSurfaceView* pojavWindow;
 
         if (mode == 1) {  // UDP 模式
             for (UITouch *touch in touches) {
+                if (touch.view != self.surfaceView) continue;
                 [self.touchSender sendType:2 id:[self getFingerId:touch] x:0 y:0];
             }
         } else if (mode == 2) {  // 静态库模式
             for (UITouch *touch in touches) {
+                if (touch.view != self.surfaceView) continue;
                 [self sendTouchControllerProxyMessage:[self getFingerId:touch] x:0 y:0 isRemove:YES];
             }
         }
+
+        // Clear the touch to finger ID map for cancelled touches
+        [self clearTouchToFingerIdMapForTouches:touches];
 
         if (isGrabbing == JNI_TRUE) return;
     }
