@@ -162,7 +162,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     }
 }
 
-- (void)setViewControllers:(NSArray<UIViewController *> *)viewControllers animated:(BOOL)animated {
+(void)setViewControllers:(NSArray<UIViewController *> *)viewControllers animated:(BOOL)animated {
     [super setViewControllers:viewControllers animated:animated];
     if (!viewControllers.firstObject.toolbarItems && self.globalToolbarItems) {
         viewControllers.firstObject.toolbarItems = self.globalToolbarItems;
