@@ -114,7 +114,7 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
             munmap(result, getpagesize());
             // we can't continue since legacy script only allows calling breakpoint once
             [NSFileManager.defaultManager copyItemAtPath:[NSBundle.mainBundle pathForResource:@"UniversalJIT26" ofType:@"js"] toPath:[NSString stringWithFormat:@"%s/UniversalJIT26.js", getenv("POJAV_HOME")] error:nil];
-            showDialog(localize(@"Error", nil), @"Support for legacy script has been removed. Please switch to Universal JIT script. To import it, long-press on Amethyst when enabling JIT in StikDebug and tap \"Assign Script\", then go to Amethyst's Documents directory and pick it.");
+            showDialog(localize(@"Error", nil), @"Support for legacy script has been removed. Please switch to Universal JIT script. It can be found under Amethyst's Documents directory.");
             [PLLogOutputView handleExitCode:1];
             return 1;
         }
