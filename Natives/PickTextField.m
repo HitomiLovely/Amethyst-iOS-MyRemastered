@@ -8,7 +8,7 @@
 @implementation PickViewController
 - (void)loadView {
     [super loadView];
-    if(self.textField.inputAccessoryView) [self.view addSubview:self.textField.inputAccessoryView];
+    [self.view addSubview:self.textField.inputAccessoryView];
     [self.view addSubview:self.textField.inputView];
 }
 
@@ -19,9 +19,8 @@
         self.view.safeAreaInsets.top,
         MIN(self.view.frame.size.width - self.view.safeAreaInsets.right, self.preferredContentSize.width),
         MIN(self.view.frame.size.height - self.view.safeAreaInsets.bottom, self.preferredContentSize.height));
-    CGRect accessoryFrame = CGRectMake(frame.origin.x, frame.origin.y, frame.size.width, self.textField.inputAccessoryView.frame.size.height);
-    self.textField.inputAccessoryView.frame = accessoryFrame;
-    self.textField.inputView.frame = CGRectMake(frame.origin.x, CGRectGetMaxY(accessoryFrame), frame.size.width, frame.size.height - CGRectGetMaxY(self.inputAccessoryView.frame));
+    self.textField.inputAccessoryView.frame = CGRectMake(frame.origin.x, frame.origin.y, frame.size.width, self.textField.inputAccessoryView.frame.size.height);
+    self.textField.inputView.frame = CGRectMake(frame.origin.x, CGRectGetMaxY(self.textField.inputAccessoryView.frame), frame.size.width, frame.size.height - CGRectGetMaxY(self.inputAccessoryView.frame));
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
@@ -50,16 +49,13 @@
 }
 
 - (BOOL)becomeFirstResponder {
-    if (@available(iOS 19.0, *)) {
-        // iOS 26 uses popover aswell
-    } else if (!NSProcessInfo.processInfo.isMacCatalystApp) {
+    if (!NSProcessInfo.processInfo.isMacCatalystApp) {
         return [super becomeFirstResponder];
     }
 
     self.vc = [[PickViewController alloc] init];
     self.vc.modalPresentationStyle = UIModalPresentationPopover;
-    CGFloat width = MIN(400, MIN(self.window.frame.size.width, self.window.frame.size.height));
-    self.vc.preferredContentSize = CGSizeMake(width, 250);
+    self.vc.preferredContentSize = CGSizeMake(500, 250);
     self.vc.textField = self;
 
     UIPopoverPresentationController *popoverController = [self.vc popoverPresentationController];

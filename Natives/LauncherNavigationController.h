@@ -6,6 +6,7 @@ NSMutableArray<NSDictionary *> *localVersionList, *remoteVersionList;
 
 @property(nonatomic) UIProgressView *progressViewMain, *progressViewSub;
 @property(nonatomic) UILabel* progressText;
+@property(nonatomic) UIButton* buttonInstall;
 
 - (void)enterModInstallerWithPath:(NSString *)path hitEnterAfterWindowShown:(BOOL)hitEnter;
 
