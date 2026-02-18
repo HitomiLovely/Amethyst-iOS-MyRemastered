@@ -8,8 +8,4 @@
     [self.rootView addSubview:self.logOutputView];
 }
 
-- (void)viewWillTransitionToSize_LogView:(CGRect)frame {
-    self.logOutputView.frame = frame;
-}
-
 @end
