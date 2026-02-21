@@ -64,7 +64,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.versionTextField.rightView = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"SpinnerArrow"] _imageWithSize:CGSizeMake(30, 30)]];
     self.versionTextField.rightView.frame = CGRectMake(0, 0, self.versionTextField.frame.size.height * 0.9, self.versionTextField.frame.size.height * 0.9);
     self.versionTextField.leftViewMode = UITextFieldViewModeAlways;
-    self.versionTextField.rightViewMode = UITextFieldViewModeAlw    ays;
+    self.versionTextField.rightViewMode = UITextFieldViewModeAlways;
     self.versionTextField.textAlignment = NSTextAlignmentCenter;
 
     self.versionPickerView = [[PLPickerView alloc] init];
