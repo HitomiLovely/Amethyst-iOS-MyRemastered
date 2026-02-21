@@ -75,9 +75,6 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
     self.versionTextField.inputView = self.versionPickerView;
 
-    UIView *targetToolbar = self.toolbar;
-    [targetToolbar addSubview:self.versionTextField];
-
     self.progressViewMain = [[UIProgressView alloc] initWithFrame:self.versionTextField.frame];
 
     UIView *textFieldContainer = nil;
