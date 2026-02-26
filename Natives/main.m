@@ -106,7 +106,7 @@ void init_logDeviceAndVer(char *argument) {
     NSLog(@"[Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered");
     NSLog(@"[Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.");
     NSLog(@"[Pre-Init] Version: %@", NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"], CONFIG_TYPE);
-    NSLog(@"[Pre-Init] Commit: %s (%s)", CONFIG_COMMIT, CONFIG_BRANCH);
+    NSLog(@"[Pre-Init] Commit: %s (%s)", CONFIG_COMMIT);
     
     NSString *tsPath = [NSString stringWithFormat:@"%@/../_TrollStore", NSBundle.mainBundle.bundlePath];
     const char *type;
