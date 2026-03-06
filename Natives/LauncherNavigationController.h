@@ -1,5 +1,7 @@
 #import <UIKit/UIKit.h>
 
+extern BOOL _UISolariumEnabled(void) __attribute__((weak_import));
+
 NSMutableArray<NSDictionary *> *localVersionList, *remoteVersionList;
 
 @interface LauncherNavigationController : UINavigationController
@@ -13,3 +15,4 @@ NSMutableArray<NSDictionary *> *localVersionList, *remoteVersionList;
 - (void)setInteractionEnabled:(BOOL)enable forDownloading:(BOOL)downloading;
 
 @end
+
