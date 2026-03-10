@@ -16,7 +16,7 @@ extern NSNotificationName UIPresentationControllerPresentationTransitionWillBegi
 @end
 
 // private functions
-static inline BOOL UISolariumEnabledSafe(void) { return NO; }
+extern BOOL _UISolariumEnabled(void) __attribute__((weak_import));
 
 @interface UIBarButtonItem(private)
 - (UIView *)view;

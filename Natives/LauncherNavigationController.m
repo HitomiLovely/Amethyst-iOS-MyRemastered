@@ -50,7 +50,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     }
 
     UIToolbar *targetToolbar = self.toolbar;
-    BOOL hasLiquidGlass = UISolariumEnabledSafe();
+    BOOL hasLiquidGlass = _UISolariumEnabled && _UISolariumEnabled();
 
     if(hasLiquidGlass) {
         self.versionTextField = [[PickTextField alloc] initWithFrame:CGRectMake(0, 0, MIN(self.view.frame.size.width,self.view.frame.size.height)*0.75, 36)];

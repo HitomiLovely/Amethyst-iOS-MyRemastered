@@ -104,6 +104,19 @@ jobs:
           git commit -am "CI: Update gl4es"
           git push
 
+      - name: Download MobileGlues prebuilt artifact
+        id: download-mg
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          mkdir -p mobileglues-artifact
+          cd mobileglues-artifact
+          # Download MobileGlues artifact (workflow_run id: 22014226012)
+          gh run download 22014226012 --repo MobileGL-Dev/MobileGlues --name MobileGlues-iOS-dylib --dir .
+          ls -la
+          echo "Artifact downloaded successfully"
+
       - name: Build for ${{ matrix.platform_name }}
         run: |
           export PATH=/opt/homebrew/bin:$PATH
