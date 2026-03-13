@@ -399,3 +399,8 @@
 "preference.touchcontroller.vibrate.intensity.medium" = "Medium";
 "preference.touchcontroller.vibrate.intensity.heavy" = "Heavy";
 "preference.touchcontroller.moveview.enable" = "Enable Move View";
+
+"preference.title.mod_touch_enable" = "Enable TouchController support";
+"preference.detail.mod_touch_enable" = "Enable TouchController module support. Note: Enabling this option will disable the “slide-out quick bar.”";
+"mod.search" = "Search Mod..."
+"search.online" = "Search online"

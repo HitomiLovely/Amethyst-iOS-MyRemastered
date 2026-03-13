@@ -29,7 +29,7 @@
     // Create a container for label + switch and make it compact but wide enough
     UIView *container = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 140, 32)];
     UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 78, 32)];
-    label.text = @"上网搜索";
+    label.text = @"search.online";
     label.font = [UIFont systemFontOfSize:13];
     label.textAlignment = NSTextAlignmentRight;
     label.autoresizingMask = UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleRightMargin;
@@ -51,7 +51,7 @@
 
     // 创建搜索栏
     self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.frame.size.width, 44)];
-    self.searchBar.placeholder = @"搜索 Mod...";
+    self.searchBar.placeholder = @"mod.search";
     self.searchBar.delegate = self;
     self.searchBar.barStyle = UIBarStyleDefault;
     self.searchBar.searchBarStyle = UISearchBarStyleMinimal;
@@ -161,8 +161,8 @@
     NSError *err = nil;
     BOOL ok = [[ModService sharedService] toggleEnableForMod:m error:&err];
     if (!ok) {
-        UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"错误" message:err.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
-        [ac addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+        UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Error" message:err.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+        [ac addAction:[UIAlertAction actionWithTitle:@"Confirm" style:UIAlertActionStyleDefault handler:nil]];
         [self presentViewController:ac animated:YES completion:nil];
     } else {
         [self.tableView reloadRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationAutomatic];
@@ -173,9 +173,9 @@
     NSIndexPath *ip = [self.tableView indexPathForCell:cell];
     if (!ip) return;
     ModItem *m = self.filteredMods[ip.row];
-    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"确认删除" message:m.displayName preferredStyle:UIAlertControllerStyleAlert];
-    [ac addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [ac addAction:[UIAlertAction actionWithTitle:@"删除" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Confirm Deletion" message:m.displayName preferredStyle:UIAlertControllerStyleAlert];
+    [ac addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+    [ac addAction:[UIAlertAction actionWithTitle:@"Delete" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
         NSError *err = nil;
         if ([[ModService sharedService] deleteMod:m error:&err]) {
             // 从filteredMods和mods中移除
@@ -192,8 +192,8 @@
             
             [self.tableView deleteRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationAutomatic];
         } else {
-            UIAlertController *errAc = [UIAlertController alertControllerWithTitle:@"删除失败" message:err.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
-            [errAc addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+            UIAlertController *errAc = [UIAlertController alertControllerWithTitle:@"Deletion failed" message:err.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+            [errAc addAction:[UIAlertAction actionWithTitle:@"Confirm" style:UIAlertActionStyleDefault handler:nil]];
             [self presentViewController:errAc animated:YES completion:nil];
         }
     }]];
@@ -215,8 +215,8 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             [[UIApplication sharedApplication] openURL:u options:@{} completionHandler:^(BOOL success) {
                 if (!success) {
-                    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"无法打开链接" message:urlStr preferredStyle:UIAlertControllerStyleAlert];
-                    [ac addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+                    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Unable to open the link" message:urlStr preferredStyle:UIAlertControllerStyleAlert];
+                    [ac addAction:[UIAlertAction actionWithTitle:@"Confirm" style:UIAlertActionStyleDefault handler:nil]];
                     [self presentViewController:ac animated:YES completion:nil];
                 }
             }];

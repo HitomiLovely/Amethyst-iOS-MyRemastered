@@ -35,15 +35,15 @@
 }
 
 - (void)openImagePicker {
-    // 检查是否已经显示了图片选择器
+    // Check if the image picker is already displayed
     for (UIWindow *window in UIApplication.sharedApplication.windows) {
         for (UIWindowScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if ([scene isKindOfClass:[UIWindowScene class]]) {
                 for (UIWindow *window in scene.windows) {
                     for (UIView *view in window.subviews) {
-                        if ([view isKindOfClass:[UIAlertController class]] || 
+                        if ([view isKindOfClass:[UIAlertController class]] ||
                             [view isKindOfClass:[UIImagePickerController class]]) {
-                            // 如果已经显示了相关控制器，直接返回
+                            // If an alert or image picker is already showing, return
                             return;
                         }
                     }
@@ -51,12 +51,12 @@
             }
         }
     }
-    
+
     UIImagePickerController *imagePicker = [[UIImagePickerController alloc] init];
     imagePicker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
     imagePicker.delegate = self;
-    
-    // 延迟显示图片选择器，避免与UIAlertController冲突
+
+    // Delay presenting image picker to avoid conflicts with UIAlertController
     dispatch_async(dispatch_get_main_queue(), ^{
         [self presentViewController:imagePicker animated:YES completion:nil];
     });
@@ -76,11 +76,11 @@
 
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
     [picker dismissViewControllerAnimated:YES completion:^{
-        // 在图片选择器完全关闭后再处理图片
+        // Process the selected image after picker fully closes
         dispatch_async(dispatch_get_main_queue(), ^{
             UIImage *selectedImage = info[UIImagePickerControllerOriginalImage];
             if (!selectedImage) {
-                [self showCustomIconError:@"无法获取选中的图片"];
+                [self showCustomIconError:@"Unable to retrieve the selected image"];
                 return;
             }
             if (self.pickingMousePointer) {
@@ -91,52 +91,50 @@
                 BOOL ok = [pngData writeToFile:path atomically:YES];
                 if (ok) {
                     [NSNotificationCenter.defaultCenter postNotificationName:@"MousePointerUpdated" object:nil];
-                    [self showSuccessMessage:@"鼠标指针已更新"];
+                    [self showSuccessMessage:@"Mouse pointer updated"];
                 } else {
-                    [self showCustomIconError:@"保存鼠标指针失败"];
+                    [self showCustomIconError:@"Failed to save mouse pointer"];
                 }
                 return;
             }
-            // 显示处理中的提示
+            // Show processing indicator
             [self showProcessingIndicator];
-            
-            // 检查图片是否为正方形
+
+            // Check if the image is square
             if (selectedImage.size.width != selectedImage.size.height) {
-                // 如果不是正方形，打开裁剪界面
+                // If not square, open cropper
                 ImageCropperViewController *cropperVC = [[ImageCropperViewController alloc] initWithImage:selectedImage];
                 __weak typeof(self) weakSelf = self;
                 cropperVC.completionHandler = ^(UIImage * _Nullable croppedImage) {
                     if (croppedImage) {
-                        // 保存裁剪后的图片
+                        // Save cropped image
                         [[CustomIconManager sharedManager] saveCustomIcon:croppedImage withCompletion:^(BOOL success, NSError * _Nullable error) {
                             dispatch_async(dispatch_get_main_queue(), ^{
                                 if (success) {
-                                    [weakSelf showSuccessMessage:@"图片已保存，您可以在应用图标设置中选择自定义图标"];
-                                    // 更新应用图标选择器的显示
+                                    [weakSelf showSuccessMessage:@"Image saved. You can select it in the app icon settings"];
                                     [weakSelf.tableView reloadData];
                                 } else {
-                                    NSString *errorMessage = error.localizedDescription ?: @"保存自定义图标失败";
+                                    NSString *errorMessage = error.localizedDescription ?: @"Failed to save custom icon";
                                     [weakSelf showCustomIconError:errorMessage];
                                 }
                             });
                         }];
                     } else {
                         dispatch_async(dispatch_get_main_queue(), ^{
-                            [weakSelf showCustomIconError:@"图片裁剪已取消"];
+                            [weakSelf showCustomIconError:@"Image cropping cancelled"];
                         });
                     }
                 };
                 [weakSelf.navigationController pushViewController:cropperVC animated:YES];
             } else {
-                // 如果是正方形，直接保存
+                // Save directly if square
                 [[CustomIconManager sharedManager] saveCustomIcon:selectedImage withCompletion:^(BOOL success, NSError * _Nullable error) {
                     dispatch_async(dispatch_get_main_queue(), ^{
                         if (success) {
-                            [self showSuccessMessage:@"图片已保存，您可以在应用图标设置中选择自定义图标"];
-                            // 更新应用图标选择器的显示
+                            [self showSuccessMessage:@"Image saved. You can select it in the app icon settings"];
                             [self.tableView reloadData];
                         } else {
-                            NSString *errorMessage = error.localizedDescription ?: @"保存自定义图标失败";
+                            NSString *errorMessage = error.localizedDescription ?: @"Failed to save custom icon";
                             [self showCustomIconError:errorMessage];
                         }
                     });
@@ -152,7 +150,7 @@
             if (self.pickingMousePointer) {
                 self.pickingMousePointer = NO;
             } else {
-                [self showCustomIconError:@"图片选择已取消"];
+                [self showCustomIconError:@"Image selection cancelled"];
             }
         });
     }];
@@ -161,25 +159,25 @@
 #pragma mark - Custom Icon Helper Methods
 
 - (void)showProcessingIndicator {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"处理中" message:@"正在处理您选择的图片..." preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Processing" message:@"Processing your selected image..." preferredStyle:UIAlertControllerStyleAlert];
     [self presentViewController:alert animated:YES completion:nil];
-    
-    // 2秒后自动关闭提示
+
+    // Automatically close after 2 seconds
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [alert dismissViewControllerAnimated:YES completion:nil];
     });
 }
 
 - (void)showSuccessMessage:(NSString *)message {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"成功" message:message preferredStyle:UIAlertControllerStyleAlert];
-    UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Success" message:message preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil];
     [alert addAction:okAction];
     [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)showCustomIconError:(NSString *)errorMessage {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"错误" message:errorMessage preferredStyle:UIAlertControllerStyleAlert];
-    UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Error" message:errorMessage preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertAction *okAction = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil];
     [alert addAction:okAction];
     [self presentViewController:alert animated:YES completion:nil];
 }
@@ -194,34 +192,32 @@
         NSString *keyFull = [NSString stringWithFormat:@"%@.%@", section, key];
         setPrefObject(keyFull, value);
     };
-    
+
     self.hasDetail = YES;
     self.prefDetailVisible = self.navigationController == nil;
-    
+
     self.prefSections = @[@"general", @"video", @"control", @"java", @"debug"];
 
     self.rendererKeys = getRendererKeys(NO);
     self.rendererList = getRendererNames(NO);
-    
+
     BOOL(^whenNotInGame)() = ^BOOL(){
         return self.navigationController != nil;
     };
 
-    // --- 定义弹窗显示的 Block，防止循环引用使用 weakSelf ---
     __weak typeof(self) weakSelf = self;
     void (^showTouchInfoAlert)(BOOL) = ^(BOOL enabled) {
-        // 这个 Block 仅用于显示说明，不再负责逻辑判断
         dispatch_async(dispatch_get_main_queue(), ^{
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"preference.popup.touch_info.title", nil)
                                                                            message:localize(@"preference.popup.touch_info.message", nil)
                                                                     preferredStyle:UIAlertControllerStyleAlert];
-            
+
             [alert addAction:[UIAlertAction actionWithTitle:localize(@"OK", nil) style:UIAlertActionStyleDefault handler:nil]];
-            
+
             [alert addAction:[UIAlertAction actionWithTitle:@"GitHub" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
                 [[UIApplication sharedApplication] openURL:[NSURL URLWithString:@"https://github.com/TouchController/TouchController"] options:@{} completionHandler:nil];
             }]];
-            
+
             [weakSelf presentViewController:alert animated:YES completion:nil];
         });
     };
@@ -462,9 +458,9 @@
             // Control settings
             @{@"icon": @"gamecontroller"},
             
-            // --- [修改] TouchController 模组支持 ---
+            // --- [Modified] TouchController module support ---
             @{@"key": @"mod_touch_enable",
-              @"icon": @"hand.point.up.left", // SF Symbols 图标
+              @"icon": @"hand.point.up.left", // SF Symbols icon
               @"hasDetail": @YES,
               @"type": self.typeChildPane,
               @"enableCondition": whenNotInGame,
@@ -498,7 +494,7 @@
                     NSString *path = [NSString stringWithFormat:@"%s/controlmap/mouse_pointer.png", getenv("POJAV_HOME")];
                     [NSFileManager.defaultManager removeItemAtPath:path error:nil];
                     [NSNotificationCenter.defaultCenter postNotificationName:@"MousePointerUpdated" object:nil];
-                    [self showSuccessMessage:@"鼠标指针已恢复默认"];
+                    [self showSuccessMessage:@"Mouse pointer has been restored to default"];
                 }
             },
             @{@"key": @"hardware_hide",
@@ -511,51 +507,51 @@
                 @"hasDetail": @YES,
                 @"type": self.typeSwitch,
             },
-            
-            // --- [重构] 双指呼出键盘控制 ---
-            // 同样改为按钮+弹窗模式，彻底解决开关回弹问题
-            @{@"key": @"two_finger_keyboard", 
-              @"icon": @"keyboard", // 键盘图标
+
+            // --- [Refactor] Two-finger keyboard trigger ---
+            // Changed to button + popup mode to fully fix toggle rebound issues
+            @{@"key": @"two_finger_keyboard",
+              @"icon": @"keyboard", // Keyboard icon
               @"hasDetail": @YES,
-              @"type": self.typeButton, // 关键：改为 Button 类型
-              
+              @"type": self.typeButton, // Key: changed to Button type
+
               @"action": ^void() {
-                  // 1. 获取当前状态
+                  // 1. Get current status
                   BOOL isOn = getPrefBool(@"control.two_finger_keyboard");
-                  
-                  // 2. 构建弹窗
+
+                  // 2. Build popup
                   NSString *title = localize(@"preference.title.two_finger_keyboard", nil);
-                  // 如果没有 localization，设置默认标题
+                  // If localization not available, set default title
                   if (!title || [title isEqualToString:@"preference.title.two_finger_keyboard"]) {
-                      title = @"双指呼出键盘";
+                      title = @"Two-finger keyboard trigger";
                   }
-                  
-                  NSString *statusMsg = isOn ? @"✅ 当前状态: 已开启 (ON)" : @"❌ 当前状态: 已关闭 (OFF)";
-                  NSString *msg = [NSString stringWithFormat:@"%@\n\n开启后，在游戏中双指同时长按屏幕可呼出键盘。\n此功能由WeiErLiTeo制作。", statusMsg];
-                  
+
+                  NSString *statusMsg = isOn ? @"✅ Current status: ON" : @"❌ Current status: OFF";
+                  NSString *msg = [NSString stringWithFormat:@"%@\n\nWhen enabled, long-pressing the screen with two fingers in-game will trigger the keyboard.\nFeature by WeiErLiTeo.", statusMsg];
+
                   UIAlertController *alert = [UIAlertController alertControllerWithTitle:title message:msg preferredStyle:UIAlertControllerStyleAlert];
-                  
-                  // 3. 根据当前状态显示不同的按钮
+
+                  // 3. Show different buttons based on current status
                   if (!isOn) {
-                      [alert addAction:[UIAlertAction actionWithTitle:@"开启 (Enable)" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-                          // 强制开启
+                      [alert addAction:[UIAlertAction actionWithTitle:@"Enable" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                          // Force enable
                           setPrefBool(@"control.two_finger_keyboard", YES);
-                          [weakSelf showSuccessMessage:@"双指呼出键盘已开启"];
-                          // 刷新界面
+                          [weakSelf showSuccessMessage:@"Two-finger keyboard trigger enabled"];
+                          // Refresh table
                           [weakSelf.tableView reloadData];
                       }]];
                   } else {
-                      [alert addAction:[UIAlertAction actionWithTitle:@"关闭 (Disable)" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
-                          // 强制关闭
+                      [alert addAction:[UIAlertAction actionWithTitle:@"Disable" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+                          // Force disable
                           setPrefBool(@"control.two_finger_keyboard", NO);
-                          [weakSelf showSuccessMessage:@"双指呼出键盘已关闭"];
-                          // 刷新界面
+                          [weakSelf showSuccessMessage:@"Two-finger keyboard trigger disabled"];
+                          // Refresh table
                           [weakSelf.tableView reloadData];
                       }]];
                   }
-                  
-                  [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-                  
+
+                  [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+
                   [weakSelf presentViewController:alert animated:YES completion:nil];
               }
             },
