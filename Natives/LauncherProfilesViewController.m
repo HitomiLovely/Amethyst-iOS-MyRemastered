@@ -175,7 +175,7 @@ typedef NS_ENUM(NSUInteger, LauncherProfilesTableSection) {
         cell.accessoryView = view;
     } else if (row == 2) {
         cell.imageView.image = [UIImage systemImageNamed:@"puzzlepiece.extension"];
-        cell.textLabel.text = @"管理 Mod";
+        cell.textLabel.text = @"Manage Mods";
         cell.detailTextLabel.text = nil;
     }
 }
