@@ -66,7 +66,15 @@ void* JIT26PrepareRegion(void *addr, size_t len);
 void JIT26PrepareRegionForPatching(void *addr, size_t len);
 void JIT26SetDetachAfterFirstBr(BOOL value);
 void JIT26SendJITScript(NSString* script);
-BOOL DeviceRequiresTXMWorkaround(void);
+
+// Device JIT flags
+typedef enum {
+    JIT_FLAG_IS_IOS_26 = 1 << 0,
+    JIT_FLAG_FORCE_MIRRORED = 1 << 1,
+    JIT_FLAG_HAS_TXM = 1 << 2,
+} JITFlags;
+JITFlags DeviceGetJITFlags(BOOL refresh);
+BOOL DeviceHasJITFlags(JITFlags flags);
 
 // Init functions
 void init_bypassDyldLibValidation();

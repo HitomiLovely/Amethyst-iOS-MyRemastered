@@ -68,7 +68,7 @@ bool redirectFunctionDirect(char *name, void *patchAddr, void *target) {
 }
 // redirectFunction for iOS 26+ (TXM)
 bool redirectFunctionMirrored(char *name, void *patchAddr, void *target) {
-    if (DeviceRequiresTXMWorkaround()) {
+    if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
         JIT26PrepareRegionForPatching(patchAddr, sizeof(patch));
     }
     // mirror `addr` (rx, JIT applied) to `mirrored` (rw)
@@ -161,8 +161,9 @@ void* hooked_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off
     
     void *map = __mmap(addr, len, prot, flags, fd, offset);
     if (map == MAP_FAILED && fd && (prot & PROT_EXEC)) {
+        printf("[DyldLVBypass] mmap(prot=%d, flags=%d, fd=%d)\n", prot, flags, fd);
         map = __mmap(addr, len, prot, flags | MAP_PRIVATE | MAP_ANON, 0, 0);
-        if (DeviceRequiresTXMWorkaround()) {
+        if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
             JIT26PrepareRegion(map, len);
         }
         
@@ -187,7 +188,11 @@ int hooked___fcntl(int fildes, int cmd, void *param) {
 #if !(TARGET_OS_MACCATALYST || TARGET_OS_SIMULATOR)
         // attempt to attach code signature on iOS only as the binaries may have been signed
         // on macOS, attaching on unsigned binaries without CS_DEBUGGED will crash
-        orig_fcntl(fildes, cmd, param);
+        // ignoreFcntl is a special case for vphone or dev unit with TXM JIT enforcement disabled
+        BOOL ignoreFcntl = DeviceHasJITFlags(JIT_FLAG_IS_IOS_26 | JIT_FLAG_HAS_TXM) && !DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED);
+        if (!ignoreFcntl) {
+            orig_fcntl(fildes, cmd, param);
+        }
 #endif
         fsignatures_t *fsig = (fsignatures_t*)param;
         // called to check that cert covers file.. so we'll make it cover everything ;)
@@ -213,21 +218,23 @@ void init_bypassDyldLibValidation() {
 
     NSDebugLog(@"[DyldLVBypass] init");
     
-    if (@available(iOS 26.0, *)) {
-        if (DeviceRequiresTXMWorkaround()) {
+    switch ((int)DeviceGetJITFlags(YES)) {
+        case JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM:
             NSDebugLog(@"[DyldLVBypass] Using redirectFunctionMirrored");
             redirectFunction = redirectFunctionMirrored;
-        } else {
+            break;
+        case JIT_FLAG_FORCE_MIRRORED:{
             // Special special case for non-TXM iOS 26+
             // We can JIT without script, but we cannot modify existing code in dsc without it.
             // Therefore, we choose a hook method that avoids patching code in dsc completely, using hardware breakpoint.
             // The function only stashes the original function pointers, and the breakpoint handler will redirect to our hook
             NSDebugLog(@"[DyldLVBypass] Using redirectFunctionHWBreakpoint");
             redirectFunction = redirectFunctionHWBreakpoint;
-        }
-    } else {
-        NSDebugLog(@"[DyldLVBypass] Using redirectFunctionDirect");
-        redirectFunction = redirectFunctionDirect;
+            break;
+        default:
+            NSDebugLog(@"[DyldLVBypass] Using redirectFunctionDirect");
+            redirectFunction = redirectFunctionDirect;
+            break;
     }
     
     // Modifying exec page during execution may cause SIGBUS, so ignore it now

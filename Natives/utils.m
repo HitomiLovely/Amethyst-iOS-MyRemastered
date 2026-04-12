@@ -15,12 +15,13 @@ void* SecTaskCreateFromSelf(CFAllocatorRef allocator);
 BOOL getEntitlementValue(NSString *key) {
     void *secTask = SecTaskCreateFromSelf(NULL);
     CFTypeRef value = SecTaskCopyValueForEntitlement(SecTaskCreateFromSelf(NULL), key, nil);
-    if (value != nil) {
-        CFRelease(value);
-    }
     CFRelease(secTask);
 
-    return value != nil && [(__bridge id)value boolValue];
+    if (value == nil) {
+        return NO;
+    }
+    CFRelease(value);
+    return ![(__bridge id)value isKindOfClass:NSNumber.class] || [(__bridge id)value boolValue];
 }
 
 BOOL isJITEnabled(BOOL checkCSFlags) {
@@ -185,22 +186,60 @@ void JIT26SendJITScript(NSString* script) {
     NSCAssert(script, @"Script must not be nil");
     BreakSendJITScript((char*)script.UTF8String, script.length);
 }
-BOOL DeviceRequiresTXMWorkaround(void) {
-    if (@available(iOS 16.0, *)) {
-        DIR *d = opendir("/private/preboot");
-        if(!d) return NO;
-        struct dirent *dir;
-        char txmPath[PATH_MAX];
-        while ((dir = readdir(d)) != NULL) {
-            if(strlen(dir->d_name) == 96) {
-                snprintf(txmPath, sizeof(txmPath), "/private/preboot/%s/usr/standalone/firmware/FUD/Ap,TrustedExecutionMonitor.img4", dir->d_name);
-                break;
+
+BOOL DeviceCanCreateRXMap(void) {
+    // This is only guaranteed to be accurate when JIT is already enabled. Obviously this is only useful for vphone and similar internal environments where JIT is always enabled.
+    uint32_t *map = mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
+    assert(map != MAP_FAILED);
+    *map = 0xFFFFFFFF;
+    int ret = mprotect(map, getpagesize(), PROT_READ | PROT_EXEC) | mprotect(map, getpagesize(), PROT_READ | PROT_EXEC);
+    munmap(map, getpagesize());
+    return ret == 0;
+}
+BOOL DeviceHasTXM(void) {
+    DIR *d = opendir("/private/preboot");
+    if(!d) return NO;
+    struct dirent *dir;
+    char txmPath[PATH_MAX];
+    while ((dir = readdir(d)) != NULL) {
+        if(strlen(dir->d_name) == 96) {
+            snprintf(txmPath, sizeof(txmPath), "/private/preboot/%s/usr/standalone/firmware/FUD/Ap,TrustedExecutionMonitor.img4", dir->d_name);
+            break;
+        }
+    }
+    closedir(d);
+    return access(txmPath, F_OK) == 0;
+}
+JITFlags DeviceGetJITFlags(BOOL refresh) {
+    static JITFlags cachedFlags = 0;
+    static dispatch_once_t onceToken;
+    if (refresh) onceToken = 0;
+    dispatch_once(&onceToken, ^{
+        const char *s = getenv("JIT_FLAGS");
+        if (s) {
+            if (s[0] == '0' && tolower(s[1]) == 'b') {
+                cachedFlags = strtoul(s + 2, NULL, 2);
+            } else {
+                cachedFlags = strtoul(s, NULL, 0);
+            }
+            NSLog(@"[JIT] Using overridden JIT flags: 0x%X", cachedFlags);
+            return;
+        }
+
+        if (@available(iOS 26.0, *)) {
+            cachedFlags |= JIT_FLAG_IS_IOS_26;
+            if (!DeviceCanCreateRXMap()) {
+                cachedFlags |= JIT_FLAG_FORCE_MIRRORED;
             }
         }
-        closedir(d);
-        return access(txmPath, F_OK) == 0;
-    }
-    return NO;
+        if (DeviceHasTXM()) {
+            cachedFlags |= JIT_FLAG_HAS_TXM;
+        }
+    });
+    return cachedFlags;
+}
+BOOL DeviceHasJITFlags(JITFlags flags) {
+    return (DeviceGetJITFlags(NO) & flags) == flags;
 }
 
 void dismissModalViewController(UIViewController *viewController) {

@@ -106,7 +106,10 @@ void init_loadCustomJvmFlags(int* argc, const char** argv) {
 int launchJVM(NSString *username, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
-    BOOL requiresTXMWorkaround = DeviceRequiresTXMWorkaround();
+    init_loadDefaultEnv();
+    init_loadCustomEnv();
+
+    BOOL requiresTXMWorkaround = DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM);
     BOOL jit26AlwaysAttached = getPrefBool(@"debug.debug_always_attached_jit");
     if (requiresTXMWorkaround) {
         static void *result;
@@ -147,10 +150,6 @@ int launchJVM(NSString *username, id launchTarget, int width, int height, int mi
     } else {
         NSLog(@"[DyldLVBypass] Hook disabled! Loading unsigned dylib will cause code signature error.");
     }
-
-
-    init_loadDefaultEnv();
-    init_loadCustomEnv();
 
     // --- [更新] TouchController 通信方式支持 ---
     // 检查是否启用了 TouchController 以及选择的通信方式

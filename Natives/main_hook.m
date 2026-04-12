@@ -67,8 +67,8 @@ void hooked_exit(int code) {
 
 void* hooked_dlopen(const char* path, int mode) {
     BOOL shouldUseDyldBypass26PPL = NO;
-    if (@available(iOS 19.0, *)) {
-        shouldUseDyldBypass26PPL = hwRedirectOrig[0] && !DeviceRequiresTXMWorkaround();
+    if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED)) {
+        shouldUseDyldBypass26PPL = hwRedirectOrig[0] && !DeviceHasJITFlags(JIT_FLAG_HAS_TXM);
     }
     // Only patch Mach-O and use dyld bypass dylib is in the home dir
     // or tmp dir: LiveContainer makes a symlink to its own tmp dir so checking home dir alone would fail
