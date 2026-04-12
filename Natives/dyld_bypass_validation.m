@@ -223,7 +223,7 @@ void init_bypassDyldLibValidation() {
             NSDebugLog(@"[DyldLVBypass] Using redirectFunctionMirrored");
             redirectFunction = redirectFunctionMirrored;
             break;
-        case JIT_FLAG_FORCE_MIRRORED:{
+        case JIT_FLAG_FORCE_MIRRORED:
             // Special special case for non-TXM iOS 26+
             // We can JIT without script, but we cannot modify existing code in dsc without it.
             // Therefore, we choose a hook method that avoids patching code in dsc completely, using hardware breakpoint.
