@@ -160,8 +160,13 @@ void* hooked_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off
     }
     
     void *map = __mmap(addr, len, prot, flags, fd, offset);
+    // Handle some cases where it will still map but without executable permission
+    if (mprotect(map, len, prot) == -1) {
+        munmap(map, len);
+        map = MAP_FAILED;
+    }
     if (map == MAP_FAILED && fd && (prot & PROT_EXEC)) {
-        printf("[DyldLVBypass] mmap(prot=%d, flags=%d, fd=%d)\n", prot, flags, fd);
+        //printf("[DyldLVBypass] mmap(prot=%d, flags=%d, fd=%d)\n", prot, flags, fd);
         map = __mmap(addr, len, prot, flags | MAP_PRIVATE | MAP_ANON, 0, 0);
         if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
             JIT26PrepareRegion(map, len);
