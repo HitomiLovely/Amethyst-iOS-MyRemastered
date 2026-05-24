@@ -223,21 +223,23 @@ void init_bypassDyldLibValidation() {
 
     NSDebugLog(@"[DyldLVBypass] init");
     
-    if (@available(iOS 26.0, *)) {
-        if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
+    switch ((int)DeviceGetJITFlags(YES)) {
+        case JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM:
             NSDebugLog(@"[DyldLVBypass] Using redirectFunctionMirrored");
             redirectFunction = redirectFunctionMirrored;
-        } else if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED)) {
-            // Non-TXM iOS 26+: avoid patching code in dsc, use hardware breakpoint instead
+            break;
+        case JIT_FLAG_FORCE_MIRRORED:
+            // Special special case for non-TXM iOS 26+
+            // We can JIT without script, but we cannot modify existing code in dsc without it.
+            // Therefore, we choose a hook method that avoids patching code in dsc completely, using hardware breakpoint.
+            // The function only stashes the original function pointers, and the breakpoint handler will redirect to our hook
             NSDebugLog(@"[DyldLVBypass] Using redirectFunctionHWBreakpoint");
             redirectFunction = redirectFunctionHWBreakpoint;
-        } else {
+            break;
+        default:
             NSDebugLog(@"[DyldLVBypass] Using redirectFunctionDirect");
             redirectFunction = redirectFunctionDirect;
-        }
-    } else {
-        NSDebugLog(@"[DyldLVBypass] Using redirectFunctionDirect");
-        redirectFunction = redirectFunctionDirect;
+            break;
     }
     
     // Modifying exec page during execution may cause SIGBUS, so ignore it now
